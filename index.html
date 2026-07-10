@@ -24,7 +24,7 @@
         const { useState, useEffect, createContext, useContext } = React;
 
         // ==========================================
-        // 1. ICONS (Replaced Lucide React with SVG)
+        // 1. ICONS
         // ==========================================
         const Icons = {
             Home: (props) => <svg className={props.className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>,
@@ -49,32 +49,28 @@
         // ==========================================
         const AppContext = createContext(undefined);
 
-        // સેમ્પલ પ્રોડક્ટ્સ ખાલી કરી દીધા છે
-        const INITIAL_PRODUCTS = [];
-
         function AppProvider({ children }) {
             const [user, setUser] = useState(null);
-            const [invitedAdmins, setInvitedAdmins] = useState(['sachin2317u@gmail.com']); // મૂળ એડમિન
-            const [registeredUsers, setRegisteredUsers] = useState([]);
-            const [products, setProducts] = useState(INITIAL_PRODUCTS);
-            const [cart, setCart] = useState([]);// ==========================================
+            const [invitedAdmins, setInvitedAdmins] = useState(['sachin2317@gmail.com']); 
+            const [products, setProducts] = useState([]); 
+            const [cart, setCart] = useState([]);
             const [orders, setOrders] = useState([]);
             const [customRequests, setCustomRequests] = useState([]);
 
-            const addToCart = (product) => {
+            const addToCart = (product, selectedSize) => {
                 setCart(prev => {
-                    const existing = prev.find(item => item.id === product.id);
-                    if (existing) return prev.map(item => item.id === existing.id ? { ...item, quantity: item.quantity + 1 } : item);
-                    return [...prev, { ...product, quantity: 1 }];
+                    const existing = prev.find(item => item.id === product.id && item.selectedSize?.name === selectedSize?.name);
+                    if (existing) return prev.map(item => item === existing ? { ...item, quantity: item.quantity + 1 } : item);
+                    return [...prev, { ...product, selectedSize, quantity: 1 }];
                 });
             };
-            const removeFromCart = (id) => setCart(prev => prev.filter(item => item.id !== id));
-            const updateQuantity = (id, quantity) => setCart(prev => prev.map(item => item.id === id ? { ...item, quantity } : item));
+            const removeFromCart = (index) => setCart(prev => prev.filter((_, i) => i !== index));
+            const updateQuantity = (index, quantity) => setCart(prev => prev.map((item, i) => i === index ? { ...item, quantity } : item));
             const clearCart = () => setCart([]);
 
             return (
                 <AppContext.Provider value={{ 
-                    user, setUser, invitedAdmins, setInvitedAdmins, registeredUsers, setRegisteredUsers,
+                    user, setUser, invitedAdmins, setInvitedAdmins,
                     products, setProducts, cart, addToCart, removeFromCart, updateQuantity, clearCart,
                     orders, setOrders, customRequests, setCustomRequests
                 }}>
@@ -82,7 +78,6 @@
                 </AppContext.Provider>
             );
         }
-
         const useStore = () => useContext(AppContext);
 
         // ==========================================
@@ -99,32 +94,63 @@
                             <p className="text-slate-500 mt-1">Discover unique creations</p>
                         </div>
                     </div>
-                    {/* અહીં grid-cols-2 કર્યું છે જેથી મોબાઈલમાં ૨ પ્રોડક્ટ દેખાય */}
                     <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
                         {products.length === 0 ? (
                             <div className="col-span-full text-center py-20 bg-white rounded-xl border border-slate-200 text-slate-500">
                                 હાલમાં કોઈ પ્રોડક્ટ ઉપલબ્ધ નથી.
                             </div>
                         ) : (
-                            products.map(product => (
-                                <div key={product.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden group flex flex-col">
-                                    <div className="aspect-square bg-slate-100 overflow-hidden relative">
-                                        <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                                    </div>
-                                    <div className="p-3 sm:p-5 flex-1 flex flex-col">
-                                        <span className="text-[10px] sm:text-xs font-semibold text-blue-600 uppercase tracking-wider mb-1">{product.category}</span>
-                                        <h3 className="font-bold text-sm sm:text-lg text-slate-900 mb-1 line-clamp-1">{product.name}</h3>
-                                        <p className="text-slate-500 text-xs sm:text-sm mb-4 line-clamp-2">{product.description}</p>
-                                        <div className="mt-auto flex items-center justify-between">
-                                            <span className="text-sm sm:text-xl font-bold text-slate-900">${parseFloat(product.price).toFixed(2)}</span>
-                                            <button onClick={() => addToCart(product)} className="bg-slate-900 text-white p-2 rounded-lg hover:bg-slate-800 transition-colors flex items-center gap-2">
-                                                <Icons.ShoppingCart className="w-4 h-4 sm:w-5 sm:h-5" />
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))
+                            products.map(product => <ProductCard key={product.id} product={product} addToCart={addToCart} />)
                         )}
+                    </div>
+                </div>
+            );
+        }
+
+        // Product Card with Dropdown for sizes
+        function ProductCard({ product, addToCart }) {
+            const [selectedSizeIndex, setSelectedSizeIndex] = useState(0);
+            
+            // જો સાઈઝ નાખી હોય તો તે બતાવો, નહીંતર ડીફોલ્ટ કિંમત
+            const hasSizes = product.sizes && product.sizes.length > 0;
+            const currentSize = hasSizes ? product.sizes[selectedSizeIndex] : { name: 'Standard', price: product.price || 0 };
+            const currentPrice = currentSize.price;
+            
+            // મલ્ટીપલ ફોટામાંથી પહેલો ફોટો
+            const mainImage = product.images && product.images.length > 0 ? product.images[0] : (product.imageUrl || 'https://via.placeholder.com/300');
+
+            return (
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden group flex flex-col">
+                    <div className="aspect-square bg-slate-100 overflow-hidden relative">
+                        <img src={mainImage} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                        {product.images && product.images.length > 1 && (
+                            <div className="absolute bottom-1 right-1 bg-black/60 text-white text-[10px] px-2 py-1 rounded">+{product.images.length - 1} Photos</div>
+                        )}
+                    </div>
+                    <div className="p-3 sm:p-5 flex-1 flex flex-col">
+                        <span className="text-[10px] sm:text-xs font-semibold text-blue-600 uppercase tracking-wider mb-1">{product.category}</span>
+                        <h3 className="font-bold text-sm sm:text-lg text-slate-900 mb-1 line-clamp-1">{product.name}</h3>
+                        
+                        {hasSizes && (
+                            <div className="mt-2 mb-3">
+                                <select 
+                                    className="w-full border border-slate-300 rounded p-1 text-xs sm:text-sm bg-slate-50 outline-none"
+                                    value={selectedSizeIndex}
+                                    onChange={(e) => setSelectedSizeIndex(e.target.value)}
+                                >
+                                    {product.sizes.map((s, i) => (
+                                        <option key={i} value={i}>{s.name} - ₹{s.price}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
+
+                        <div className="mt-auto flex items-center justify-between">
+                            <span className="text-sm sm:text-xl font-bold text-slate-900">₹{parseFloat(currentPrice).toFixed(2)}</span>
+                            <button onClick={() => addToCart(product, currentSize)} className="bg-slate-900 text-white p-2 rounded-lg hover:bg-slate-800 transition-colors flex items-center gap-2">
+                                <Icons.ShoppingCart className="w-4 h-4 sm:w-5 sm:h-5" />
+                            </button>
+                        </div>
                     </div>
                 </div>
             );
@@ -134,14 +160,14 @@
             const { cart, removeFromCart, updateQuantity, clearCart, user, setOrders } = useStore();
             const [isCheckingOut, setIsCheckingOut] = useState(false);
             const [success, setSuccess] = useState(false);
-            const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+            
+            const total = cart.reduce((sum, item) => sum + (parseFloat(item.selectedSize?.price || item.price) * item.quantity), 0);
 
             const handleCheckout = () => {
                 if (!user) { setCurrentTab('auth'); return; }
                 if (cart.length === 0) return;
                 setIsCheckingOut(true);
                 setTimeout(() => {
-                    // એડમિન પેનલ માટે ઓર્ડરમાં યુઝરનું સરનામું પણ સેવ થશે
                     setOrders(prev => [{ id: 'ORD-' + Date.now(), userId: user.email, address: user, items: [...cart], total, date: new Date().toLocaleDateString() }, ...prev]);
                     clearCart();
                     setSuccess(true);
@@ -153,7 +179,7 @@
                 <div className="max-w-md mx-auto mt-20 p-8 bg-white rounded-xl shadow-sm border border-green-200 text-center">
                     <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4"><Icons.CreditCard className="w-8 h-8" /></div>
                     <h2 className="text-2xl font-bold text-slate-900 mb-2">Payment Successful!</h2>
-                    <p className="text-slate-600">Your order has been placed. Redirecting to your profile...</p>
+                    <p className="text-slate-600">Your order has been placed.</p>
                 </div>
             );
 
@@ -168,36 +194,40 @@
                     ) : (
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                             <div className="lg:col-span-2 space-y-4">
-                                {cart.map(item => (
-                                    <div key={item.id} className="flex flex-col sm:flex-row items-center gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                                        <img src={item.imageUrl} className="w-24 h-24 bg-slate-100 rounded-lg object-cover flex-shrink-0" />
-                                        <div className="flex-1 text-center sm:text-left">
-                                            <h3 className="font-semibold text-lg text-slate-900">{item.name}</h3>
-                                            <p className="font-bold text-blue-600">${item.price.toFixed(2)}</p>
-                                        </div>
-                                        <div className="flex items-center gap-4">
-                                            <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg p-1">
-                                                <button onClick={() => updateQuantity(item.id, Math.max(1, item.quantity - 1))} className="p-1"><Icons.Minus className="w-4 h-4" /></button>
-                                                <span className="w-8 text-center font-medium">{item.quantity}</span>
-                                                <button onClick={() => updateQuantity(item.id, item.quantity + 1)} className="p-1"><Icons.Plus className="w-4 h-4" /></button>
+                                {cart.map((item, index) => {
+                                    const itemImage = item.images && item.images.length > 0 ? item.images[0] : item.imageUrl;
+                                    const itemPrice = item.selectedSize?.price || item.price;
+                                    return (
+                                        <div key={index} className="flex flex-col sm:flex-row items-center gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                                            <img src={itemImage} className="w-24 h-24 bg-slate-100 rounded-lg object-cover flex-shrink-0" />
+                                            <div className="flex-1 text-center sm:text-left">
+                                                <h3 className="font-semibold text-lg text-slate-900">{item.name}</h3>
+                                                {item.selectedSize && <p className="text-sm text-slate-500">Size: {item.selectedSize.name}</p>}
+                                                <p className="font-bold text-blue-600">₹{parseFloat(itemPrice).toFixed(2)}</p>
                                             </div>
-                                            <button onClick={() => removeFromCart(item.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg"><Icons.Trash2 className="w-5 h-5" /></button>
+                                            <div className="flex items-center gap-4">
+                                                <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg p-1">
+                                                    <button onClick={() => updateQuantity(index, Math.max(1, item.quantity - 1))} className="p-1"><Icons.Minus className="w-4 h-4" /></button>
+                                                    <span className="w-8 text-center font-medium">{item.quantity}</span>
+                                                    <button onClick={() => updateQuantity(index, item.quantity + 1)} className="p-1"><Icons.Plus className="w-4 h-4" /></button>
+                                                </div>
+                                                <button onClick={() => removeFromCart(index)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg"><Icons.Trash2 className="w-5 h-5" /></button>
+                                            </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    )
+                                })}
                             </div>
                             <div className="lg:col-span-1">
                                 <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
                                     <h2 className="text-xl font-bold text-slate-900 mb-6">Order Summary</h2>
                                     <div className="space-y-4 mb-6 text-slate-600">
-                                        <div className="flex justify-between"><span>Subtotal</span><span>${total.toFixed(2)}</span></div>
-                                        <div className="flex justify-between"><span>Shipping</span><span>Free</span></div>
+                                        <div className="flex justify-between"><span>Subtotal</span><span>₹{total.toFixed(2)}</span></div>
                                         <div className="border-t border-slate-200 pt-4 flex justify-between font-bold text-lg text-slate-900">
-                                            <span>Total</span><span>${total.toFixed(2)}</span>
+                                            <span>Total</span><span>₹{total.toFixed(2)}</span>
                                         </div>
                                     </div>
                                     <button onClick={handleCheckout} disabled={isCheckingOut} className="w-full py-3 bg-slate-900 text-white rounded-lg hover:bg-slate-800 font-medium flex items-center justify-center gap-2">
-                                        <Icons.CreditCard className="w-5 h-5" /> {isCheckingOut ? 'Processing...' : 'Checkout'}
+                                        <Icons.CreditCard className="w-5 h-5" /> Checkout
                                     </button>
                                 </div>
                             </div>
@@ -207,65 +237,11 @@
             );
         }
 
-        // તમારું Custom Request Page કશું ડીલીટ કર્યા વગર એમ જ રાખેલું છે
-        function CustomRequestPage({ setCurrentTab }) {
-            const { user, setCustomRequests } = useStore();
-            const [photoUrl, setPhotoUrl] = useState('');
-            const [instructions, setInstructions] = useState('');
-            const [expectedDays, setExpectedDays] = useState('');
-            const [mobile, setMobile] = useState('');
-            const [success, setSuccess] = useState(false);
-
-            if (!user) { setCurrentTab('auth'); return null; }
-
-            const handlePhotoUpload = (e) => {
-                const file = e.target.files[0];
-                if (file) {
-                    const reader = new FileReader();
-                    reader.onloadend = () => setPhotoUrl(reader.result);
-                    reader.readAsDataURL(file);
-                }
-            };
-
-            const handleSubmit = (e) => {
-                e.preventDefault();
-                setCustomRequests(prev => [{ id: 'CR-' + Date.now(), userId: user.email, photoUrl, instructions, expectedDays, mobile }, ...prev]);
-                setSuccess(true);
-            };
-
-            if (success) return (
-                <div className="max-w-md mx-auto mt-20 p-8 bg-white rounded-xl shadow-sm border border-green-200 text-center">
-                    <Icons.CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-                    <h2 className="text-2xl font-bold text-slate-900 mb-2">Request Submitted!</h2>
-                    <p className="text-slate-600 mb-6">We will review your custom 3D print request and contact you shortly.</p>
-                    <button onClick={() => setCurrentTab('home')} className="px-6 py-2 bg-blue-600 text-white rounded-lg font-medium">Return Home</button>
-                </div>
-            );
-
+        function CustomRequestPage() {
             return (
-                <div className="max-w-2xl mx-auto px-4 py-6 pb-24">
-                    <div className="mb-8">
-                        <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Custom 3D Print Request</h1>
-                        <p className="text-slate-500 mt-2">Have a specific design in mind? Upload it here.</p>
-                    </div>
-                    <form onSubmit={handleSubmit} className="bg-white p-6 sm:p-8 rounded-xl shadow-sm border border-slate-200 space-y-6">
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-2">Upload Reference Image</label>
-                            <div className="border-2 border-dashed border-slate-300 rounded-lg p-6 flex flex-col items-center justify-center bg-slate-50 relative">
-                                {photoUrl ? <img src={photoUrl} className="h-48 object-contain rounded" /> : <><Icons.Upload className="w-10 h-10 text-slate-400 mb-2" /><span className="text-sm text-slate-500">Click to upload</span></>}
-                                <input type="file" accept="image/*" onChange={handlePhotoUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" required={!photoUrl} />
-                            </div>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Instructions</label>
-                            <textarea required rows="4" className="w-full px-4 py-2 border border-slate-300 rounded-lg outline-none" value={instructions} onChange={e => setInstructions(e.target.value)}></textarea>
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                            <div><label className="block text-sm font-medium text-slate-700 mb-1">Expected Days</label><input type="number" required className="w-full px-4 py-2 border rounded-lg outline-none" value={expectedDays} onChange={e => setExpectedDays(e.target.value)} /></div>
-                            <div><label className="block text-sm font-medium text-slate-700 mb-1">Mobile Number</label><input type="tel" required className="w-full px-4 py-2 border rounded-lg outline-none" value={mobile} onChange={e => setMobile(e.target.value)} /></div>
-                        </div>
-                        <button type="submit" className="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-blue-700">Submit Request</button>
-                    </form>
+                <div className="max-w-2xl mx-auto px-4 py-6 pb-24 text-center">
+                    <h1 className="text-3xl font-bold text-slate-900 mb-4">Custom Request</h1>
+                    <p className="text-slate-500">Feature disabled for update.</p>
                 </div>
             );
         }
@@ -296,8 +272,8 @@
                             {myOrders.map(o => (
                                 <div key={o.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
                                     <div className="flex justify-between font-bold border-b pb-2 mb-2"><span>{o.id}</span><span>{o.date}</span></div>
-                                    {o.items.map(i => <div key={i.id} className="flex justify-between text-sm py-1"><span>{i.quantity}x {i.name}</span><span>${(i.price * i.quantity).toFixed(2)}</span></div>)}
-                                    <div className="flex justify-between font-bold mt-3 pt-2 border-t"><span>Total</span><span>${o.total.toFixed(2)}</span></div>
+                                    {o.items.map(i => <div key={i.id} className="flex justify-between text-sm py-1"><span>{i.quantity}x {i.name} ({i.selectedSize?.name})</span><span>₹{(parseFloat(i.selectedSize?.price || i.price) * i.quantity).toFixed(2)}</span></div>)}
+                                    <div className="flex justify-between font-bold mt-3 pt-2 border-t"><span>Total</span><span>₹{o.total.toFixed(2)}</span></div>
                                 </div>
                             ))}
                         </div>
@@ -307,34 +283,95 @@
         }
 
         // ==========================================
-        // એડમિન પેનલ (ઓર્ડર અને પ્રોડક્ટ મેનેજમેન્ટ)
+        // ADMIN PANEL (સુધારેલ: ડાયનેમિક સાઇઝ બોક્સ અને મલ્ટીપલ ફોટા)
         // ==========================================
         function AdminPage({ setCurrentTab }) {
             const { user, products, setProducts, orders, invitedAdmins, setInvitedAdmins } = useStore();
             const [adminTab, setAdminTab] = useState('products'); 
             const [view, setView] = useState('list');
-            const [formData, setFormData] = useState({ id:'', name: '', description: '', price: '', imageUrl: '', category: '' });
+            
+            const [formData, setFormData] = useState({ id:'', name: '', description: '', category: '', images: [] });
+            const [sizeCount, setSizeCount] = useState(1);
+            const [sizes, setSizes] = useState([{ name: '', price: '' }]);
 
-            // માત્ર સચિન અથવા ઇન્વાઇટ કરેલા એડમિન જ પેનલ જોઈ શકશે
             if (!invitedAdmins.includes(user?.email)) { setCurrentTab('home'); return null; }
 
             const handleDelete = (id) => setProducts(products.filter(p => p.id !== id));
             
+            // ડ્રોપડાઉનમાંથી અંક બદલાય ત્યારે બોક્સ જનરેટ કરવા માટે
+            const handleSizeCountChange = (e) => {
+                const count = parseInt(e.target.value, 10);
+                setSizeCount(count);
+                
+                setSizes(prev => {
+                    const newSizes = [...prev];
+                    if (count > newSizes.length) {
+                        for (let i = newSizes.length; i < count; i++) {
+                            newSizes.push({ name: '', price: '' }); // નવા ખાલી બોક્સ ઉમેરો
+                        }
+                    } else if (count < newSizes.length) {
+                        newSizes.length = count; // વધારાના બોક્સ કાઢી નાખો
+                    }
+                    return newSizes;
+                });
+            };
+
+            const handleSizeInput = (index, field, value) => {
+                setSizes(prev => {
+                    const newSizes = [...prev];
+                    newSizes[index][field] = value;
+                    return newSizes;
+                });
+            };
+
+            // એકથી વધુ ફોટા અપલોડ કરવા માટે
+            const handleImageUpload = (e) => {
+                const files = Array.from(e.target.files);
+                if (files.length > 0) {
+                    const readers = files.map(file => {
+                        return new Promise((resolve) => {
+                            const reader = new FileReader();
+                            reader.onloadend = () => resolve(reader.result);
+                            reader.readAsDataURL(file);
+                        });
+                    });
+                    
+                    Promise.all(readers).then(imagesBase64 => {
+                        setFormData(prev => ({ ...prev, images: [...prev.images, ...imagesBase64] }));
+                    });
+                }
+            };
+
+            const removeImage = (index) => {
+                setFormData(prev => {
+                    const newImages = [...prev.images];
+                    newImages.splice(index, 1);
+                    return { ...prev, images: newImages };
+                });
+            };
+
             const handleSave = (e) => {
                 e.preventDefault();
-                const payload = { ...formData, price: parseFloat(formData.price) };
+                // સાઇઝની કિંમત નંબર માં કન્વર્ટ કરો
+                const formattedSizes = sizes.map(s => ({ name: s.name, price: parseFloat(s.price) || 0 }));
+                
+                const payload = { 
+                    ...formData, 
+                    sizes: formattedSizes, 
+                    price: formattedSizes[0]?.price || 0 
+                };
+                
                 if (formData.id) setProducts(products.map(p => p.id === formData.id ? payload : p));
                 else setProducts([{ ...payload, id: 'p' + Date.now() }, ...products]);
+                
                 setView('list');
             };
 
-            const handleImageUpload = (e) => {
-                const file = e.target.files[0];
-                if (file) {
-                    const reader = new FileReader();
-                    reader.onloadend = () => setFormData({...formData, imageUrl: reader.result});
-                    reader.readAsDataURL(file);
-                }
+            const resetForm = () => {
+                setFormData({ id:'', name: '', description: '', category: '', images: [] });
+                setSizeCount(1);
+                setSizes([{ name: '', price: '' }]);
+                setView('add');
             };
 
             const handleInviteAdmin = () => {
@@ -364,7 +401,7 @@
                         <div>
                             <div className="flex justify-end mb-4">
                                 {view === 'list' ? (
-                                    <button onClick={() => { setFormData({ id:'', name: '', description: '', price: '', imageUrl: '', category: '' }); setView('add'); }} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg font-medium"><Icons.Plus className="w-5 h-5" /> Add Product</button>
+                                    <button onClick={resetForm} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg font-medium"><Icons.Plus className="w-5 h-5" /> Add Product</button>
                                 ) : (
                                     <button onClick={() => setView('list')} className="flex items-center gap-2 text-slate-600 font-medium"><Icons.ArrowLeft className="w-5 h-5" /> Back</button>
                                 )}
@@ -381,12 +418,17 @@
                                             {products.map(p => (
                                                 <tr key={p.id} className="hover:bg-slate-50">
                                                     <td className="px-6 py-4 flex gap-4 items-center">
-                                                        <img src={p.imageUrl} className="w-12 h-12 rounded object-cover border" />
+                                                        <img src={p.images && p.images[0] ? p.images[0] : p.imageUrl} className="w-12 h-12 rounded object-cover border" />
                                                         <div><p className="font-medium text-slate-900">{p.name}</p><p className="text-xs line-clamp-1">{p.category}</p></div>
                                                     </td>
-                                                    <td className="px-6 py-4 font-medium">${p.price.toFixed(2)}</td>
+                                                    <td className="px-6 py-4 font-medium">₹{p.price.toFixed(2)}</td>
                                                     <td className="px-6 py-4 text-right">
-                                                        <button onClick={() => { setFormData(p); setView('edit'); }} className="p-2 text-slate-400 hover:text-blue-600"><Icons.Edit className="w-5 h-5" /></button>
+                                                        <button onClick={() => { 
+                                                            setFormData(p); 
+                                                            setSizes(p.sizes || [{name: '', price: ''}]);
+                                                            setSizeCount(p.sizes?.length || 1);
+                                                            setView('edit'); 
+                                                        }} className="p-2 text-slate-400 hover:text-blue-600"><Icons.Edit className="w-5 h-5" /></button>
                                                         <button onClick={() => handleDelete(p.id)} className="p-2 text-slate-400 hover:text-red-600"><Icons.Trash2 className="w-5 h-5" /></button>
                                                     </td>
                                                 </tr>
@@ -397,17 +439,60 @@
                             )}
 
                             {(view === 'add' || view === 'edit') && (
-                                <form onSubmit={handleSave} className="bg-white p-6 rounded-xl border border-slate-200 space-y-4">
-                                    <input type="text" placeholder="Product Name" required className="w-full p-2 border rounded" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
-                                    <input type="number" step="0.01" placeholder="Price" required className="w-full p-2 border rounded" value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})} />
-                                    <input type="text" placeholder="Category" required className="w-full p-2 border rounded" value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})} />
-                                    <textarea placeholder="Description" required className="w-full p-2 border rounded" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} />
-                                    <div>
-                                        <label className="block text-sm font-medium mb-2">Upload Image</label>
-                                        <input type="file" accept="image/*" onChange={handleImageUpload} className="w-full border p-2" />
-                                        {formData.imageUrl && <img src={formData.imageUrl} className="h-20 mt-2 rounded" />}
+                                <form onSubmit={handleSave} className="bg-white p-6 rounded-xl border border-slate-200 space-y-6">
+                                    
+                                    <div className="space-y-4">
+                                        <h3 className="font-bold text-lg border-b pb-2">Basic Details</h3>
+                                        <input type="text" placeholder="Product Name" required className="w-full p-2 border rounded" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
+                                        <input type="text" placeholder="Category" required className="w-full p-2 border rounded" value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})} />
+                                        <textarea placeholder="Description" required className="w-full p-2 border rounded" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} />
                                     </div>
-                                    <button type="submit" className="w-full bg-slate-900 text-white p-3 rounded font-bold">Save Product</button>
+
+                                    {/* મલ્ટીપલ ફોટા એડ કરવાની સિસ્ટમ */}
+                                    <div className="space-y-4">
+                                        <h3 className="font-bold text-lg border-b pb-2">Upload Photos (Select Multiple)</h3>
+                                        <input type="file" multiple accept="image/*" onChange={handleImageUpload} className="w-full border p-2 bg-slate-50 rounded" />
+                                        
+                                        {formData.images.length > 0 && (
+                                            <div className="flex flex-wrap gap-2 mt-2">
+                                                {formData.images.map((imgBase64, idx) => (
+                                                    <div key={idx} className="relative w-20 h-20 border rounded overflow-hidden">
+                                                        <img src={imgBase64} className="w-full h-full object-cover" />
+                                                        <button type="button" onClick={() => removeImage(idx)} className="absolute top-0 right-0 bg-red-600 text-white text-xs px-1 rounded-bl">X</button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* ડાયનેમિક સાઇઝ સિસ્ટમ */}
+                                    <div className="space-y-4">
+                                        <h3 className="font-bold text-lg border-b pb-2">Size & Pricing</h3>
+                                        <div>
+                                            <label className="text-sm font-bold text-slate-700 block mb-1">આ પ્રોડક્ટમાં કેટલી સાઇઝના ઓપ્શન આપવા છે?</label>
+                                            <select value={sizeCount} onChange={handleSizeCountChange} className="w-full sm:w-1/3 border p-2 rounded bg-white">
+                                                {[...Array(10)].map((_, i) => (
+                                                    <option key={i+1} value={i+1}>{i+1} સાઇઝ</option>
+                                                ))}
+                                            </select>
+                                        </div>
+
+                                        <div className="space-y-3 mt-4">
+                                            {sizes.map((size, idx) => (
+                                                <div key={idx} className="flex gap-4 items-center bg-slate-50 p-3 rounded border">
+                                                    <span className="font-bold text-slate-500 w-6">{idx + 1}.</span>
+                                                    <div className="flex-1">
+                                                        <input type="text" placeholder="સાઇઝનું નામ (દા.ત. Size 1)" required className="w-full p-2 border rounded" value={size.name} onChange={(e) => handleSizeInput(idx, 'name', e.target.value)} />
+                                                    </div>
+                                                    <div className="flex-1">
+                                                        <input type="number" step="0.01" placeholder="કિંમત (₹)" required className="w-full p-2 border rounded" value={size.price} onChange={(e) => handleSizeInput(idx, 'price', e.target.value)} />
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <button type="submit" className="w-full bg-slate-900 text-white p-3 rounded font-bold text-lg hover:bg-slate-800">Save Product</button>
                                 </form>
                             )}
                         </div>
@@ -418,7 +503,7 @@
                             {orders.length === 0 ? <p className="text-slate-500 bg-white p-6 border rounded-xl">હજુ કોઈ ઓર્ડર મળ્યા નથી.</p> : (
                                 orders.map(o => (
                                     <div key={o.id} className="bg-white p-4 rounded-xl border shadow-sm">
-                                        <div className="flex justify-between font-bold border-b pb-2 mb-2"><span>Order: {o.id}</span><span className="text-blue-600">${o.total.toFixed(2)}</span></div>
+                                        <div className="flex justify-between font-bold border-b pb-2 mb-2"><span>Order: {o.id}</span><span className="text-blue-600">₹{o.total.toFixed(2)}</span></div>
                                         <p className="text-sm font-bold mt-2">Customer Details:</p>
                                         <p className="text-sm text-slate-600">Name: {o.address?.name}<br/>Mobile: {o.address?.mobile}</p>
                                         <p className="text-sm font-bold mt-2">Delivery Address:</p>
@@ -436,9 +521,6 @@
             );
         }
 
-        // ==========================================
-        // AUTH PAGE (૫ ભાગનું સરનામું અને કન્ફર્મ પાસવર્ડ)
-        // ==========================================
         function AuthPage({ setCurrentTab }) {
             const { setUser } = useStore();
             const [isLogin, setIsLogin] = useState(true);
@@ -451,24 +533,19 @@
             const handleSubmit = async (e) => {
                 e.preventDefault();
                 setError('');
-
-                // પાસવર્ડ કન્ફર્મ ચેક
                 if (!isLogin && formData.password !== formData.confirmPassword) {
                     setError('પાસવર્ડ અને કન્ફર્મ પાસવર્ડ મેચ થતા નથી!');
                     return;
                 }
-
                 if (!window.fbAuth || !window.auth) {
                     alert("સિસ્ટમ લોડ થઈ રહી છે, કૃપા કરીને એક સેકન્ડ પછી ફરી પ્રયાસ કરો.");
                     return;
                 }
-                
                 if (isLogin) {
                     try {
                         const userCredential = await window.fbAuth.signInWithEmailAndPassword(window.auth, formData.email, formData.password);
                         setUser({ email: userCredential.user.email, ...formData });
                         setCurrentTab('home');
-                        alert("લોગિન સફળ રહ્યું!");
                     } catch (error) {
                         setError('ખોટો ઇમેઇલ અથવા પાસવર્ડ! કૃપા કરીને ફરી પ્રયાસ કરો.');
                     }
@@ -477,7 +554,6 @@
                         const userCredential = await window.fbAuth.createUserWithEmailAndPassword(window.auth, formData.email, formData.password);
                         setUser({ email: userCredential.user.email, ...formData });
                         setCurrentTab('home');
-                        alert("તમારું એકાઉન્ટ સફળતાપૂર્વક બની ગયું છે!");
                     } catch (error) {
                         if (error.code === 'auth/email-already-in-use') {
                             setError('આ ઇમેઇલ આઇડી પહેલેથી રજીસ્ટર થયેલું છે.');
@@ -521,15 +597,11 @@
             );
         }
 
-        // ==========================================
-        // 4. MAIN APP COMPONENT
-        // ==========================================
         function App() {
             const { user, cart, invitedAdmins } = useStore();
             const [currentTab, setCurrentTab] = useState('home');
             const cartItemsCount = cart.reduce((acc, item) => acc + item.quantity, 0);
             
-            // એડમિન ચેક 
             const isAdmin = user && invitedAdmins.includes(user.email);
 
             const navItems = [
@@ -543,9 +615,9 @@
             return (
                 <div className="min-h-screen">
                     <header className="bg-white border-b border-slate-200 shadow-sm sticky top-0 z-40">
-                        <div className="max-w-7xl mx-auto px-4 h-14 flex justify-center items-center">
-                            <button onClick={() => setCurrentTab('home')} className="text-xl font-bold text-blue-600 flex items-center gap-2">
-                                <Icons.PackagePlus className="w-6 h-6" /> Customize shop
+                        <div className="max-w-7xl mx-auto px-4 h-14 flex justify-between items-center">
+                            <button onClick={() => setCurrentTab('home')} className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                                <Icons.PackagePlus className="w-6 h-6 text-blue-600" /> Customize shop
                             </button>
                         </div>
                     </header>
@@ -579,31 +651,31 @@
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<AppProvider><App /></AppProvider>);
     </script>
+
     <script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-  import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-  import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-const firebaseConfig = {
-  apiKey: "AIzaSyBuATW-JUjY9ndWSbc4ojq8vWpC1n0ej98",
-  authDomain: "apex3d-e63c2.firebaseapp.com",
-  projectId: "apex3d-e63c2",
-  storageBucket: "apex3d-e63c2.firebasestorage.app",
-  messagingSenderId: "72705618242",
-  appId: "1:72705618242:web:7d8e2343e8effc847d10db",
-  measurementId: "G-YB6DG4PTPN"
-};
+        const firebaseConfig = {
+            apiKey: "AIzaSyBuATW-JUjY9ndWSbc4ojq8vWpC1n0ej98",
+            authDomain: "apex3d-e63c2.firebaseapp.com",
+            projectId: "apex3d-e63c2",
+            storageBucket: "apex3d-e63c2.firebasestorage.app",
+            messagingSenderId: "72705618242",
+            appId: "1:72705618242:web:7d8e2343e8effc847d18db",
+            measurementId: "G-YB6DG4PTPN"
+        };
 
-
-  const app = initializeApp(firebaseConfig);
-  window.db = getFirestore(app);
-  window.auth = getAuth(app);
-  
-  window.fb = { collection, doc, setDoc, deleteDoc, onSnapshot };
-  window.fbAuth = { signInWithEmailAndPassword, createUserWithEmailAndPassword };
-  
-  console.log("Firebase Super-Charged & Ready!");
-</script>
+        const app = initializeApp(firebaseConfig);
+        window.db = getFirestore(app);
+        window.auth = getAuth(app);
+        
+        window.fb = { collection, doc, setDoc, deleteDoc, onSnapshot };
+        window.fbAuth = { signInWithEmailAndPassword, createUserWithEmailAndPassword };
+        
+        console.log("Firebase Super-Charged & Ready!");
+    </script>
     
 </body>
 </html>
