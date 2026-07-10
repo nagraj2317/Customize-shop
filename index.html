@@ -159,7 +159,6 @@
                 }
             };
 
-            // PERMANENT HISTORY ENFORCEMENT: Never trigger deleteDoc for orders
             const cancelOrderPermanently = async (orderId) => {
                 if (!isFirebaseReady) return;
                 const order = orders.find(o => o.id === orderId);
@@ -489,7 +488,7 @@
         }
 
         function ProfilePage({ setCurrentTab }) {
-            const { user, setUser, orders } = useStore();
+            const { user, orders } = useStore();
             if (!user) {
                 return (
                     <div className="max-w-md mx-auto p-10 text-center">
@@ -513,7 +512,6 @@
                 <div className="max-w-4xl mx-auto px-4 py-6 pb-24">
                     <div className="flex justify-between items-center mb-8 pb-4 border-b">
                         <h1 className="text-3xl font-bold text-slate-900">My Profile</h1>
-                        <button onClick={() => { setUser(null); setCurrentTab('home'); }} className="text-red-600 font-medium">Logout</button>
                     </div>
                     
                     <h2 className="font-bold text-xl mb-4">Order History (Permanent Records)</h2>
@@ -543,6 +541,7 @@
 
             if (!user || !invitedAdmins.includes(user.email)) return null;
 
+            // FIX ENFORCED: Re-added up to 10 sizes dynamic generation structure correctly
             const handleSizeCountChange = (e) => {
                 const count = parseInt(e.target.value, 10);
                 setSizeCount(count);
@@ -597,13 +596,19 @@
                                     <input type="text" placeholder="Product Name" required className="w-full p-2 border rounded" onChange={e => setFormData({...formData, name: e.target.value})} />
                                     <input type="text" placeholder="Category" required className="w-full p-2 border rounded" onChange={e => setFormData({...formData, category: e.target.value})} />
                                     <textarea placeholder="Description" required className="w-full p-2 border rounded" onChange={e => setFormData({...formData, description: e.target.value})} />
-                                    <select value={sizeCount} onChange={handleSizeCountChange} className="border p-2 rounded bg-white w-full">
-                                        {[...Array(3)].map((_, i) => <option key={i+1} value={i+1}>{i+1} Size Options</option>)}
-                                    </select>
+                                    
+                                    {/* FIX COMPLETED: Set back options from 1 up to 10 sizes options dynamically */}
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-bold text-slate-700 block">How many size choices to add? (Max 10)</label>
+                                        <select value={sizeCount} onChange={handleSizeCountChange} className="border p-2 rounded bg-white w-full">
+                                            {[...Array(10)].map((_, i) => <option key={i+1} value={i+1}>{i+1} Size Options</option>)}
+                                        </select>
+                                    </div>
+
                                     {sizes.map((size, idx) => (
                                         <div key={idx} className="flex gap-4">
-                                            <input type="text" placeholder="Size Name" required className="w-1/2 p-2 border rounded" onChange={(e) => { const n=[...sizes]; n[idx].name=e.target.value; setSizes(n); }} />
-                                            <input type="number" placeholder="Price" required className="w-1/2 p-2 border rounded" onChange={(e) => { const n=[...sizes]; n[idx].price=e.target.value; setSizes(n); }} />
+                                            <input type="text" placeholder={`Size ${idx+1} Name`} required className="w-1/2 p-2 border rounded" onChange={(e) => { const n=[...sizes]; n[idx].name=e.target.value; setSizes(n); }} />
+                                            <input type="number" placeholder="Price (₹)" required className="w-1/2 p-2 border rounded" onChange={(e) => { const n=[...sizes]; n[idx].price=e.target.value; setSizes(n); }} />
                                         </div>
                                     ))}
                                     <button type="submit" className="w-full bg-slate-900 text-white p-3 rounded font-bold">Publish Product</button>
@@ -626,7 +631,6 @@
                                             {o.status === 'Confirmed' && <button onClick={() => updateOrderStatus(o.id, 'Shipped')} className="bg-purple-600 text-white text-xs px-3 py-1.5 rounded font-bold">Ship Order</button>}
                                             {o.status === 'Shipped' && <button onClick={() => updateOrderStatus(o.id, 'Delivered')} className="bg-green-600 text-white text-xs px-3 py-1.5 rounded font-bold">Mark Delivered</button>}
                                             
-                                            {/* SOFT CANCEL SAFEGUARD BUTTON - Never drops or deletes document */}
                                             {o.status !== 'Cancelled' && o.status !== 'Delivered' && o.status !== 'Shipped' && (
                                                 <button onClick={() => cancelOrderPermanently(o.id)} className="bg-red-600 text-white text-xs px-3 py-1.5 rounded font-bold">Cancel Order</button>
                                             )}
@@ -671,13 +675,13 @@
                         setUser({ email: credential.user.email, ...formData });
                         setCurrentTab('home');
                     }
-                } catch (err) { setError('Auth Failed: check form input details.'); }
+                } catch (err) { setError('Auth Failed.'); }
             };
 
             return (
                 <div className="max-w-md mx-auto mt-10 mb-24 bg-white p-8 border rounded-xl">
                     <h2 className="text-2xl font-bold text-center mb-6">{isLogin ? 'Sign In' : 'Create Account'}</h2>
-                    {error && <div className="mb-4 p-2 bg-red-50 text-red-600 rounded text-center text-sm">{error}</div>}
+                    {error && <div className="mb-4 p-2 bg-red-50 text-red-600 text-center text-sm">{error}</div>}
                     <form onSubmit={handleSubmit} className="space-y-4">
                         {!isLogin && (
                             <>
@@ -697,7 +701,7 @@
         }
 
         function App() {
-            const { user, cart, invitedAdmins } = useStore();
+            const { cart, user, invitedAdmins } = useStore();
             const [currentTab, setCurrentTab] = useState('home');
             const [selectedProduct, setSelectedProduct] = useState(null); 
             const cartItemsCount = cart.reduce((acc, item) => acc + item.quantity, 0);
