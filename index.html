@@ -14,8 +14,6 @@
         body { font-family: system-ui, -apple-system, sans-serif; background-color: #f8fafc; color: #0f172a; margin: 0; }
         .pb-safe { padding-bottom: env(safe-area-inset-bottom, 4rem); }
         .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-        
-        /* સ્લાઇડરમાંથી સ્ક્રોલબાર છુપાવવા માટે */
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
@@ -57,16 +55,11 @@
             const [user, setUser] = useState(null);
             const [invitedAdmins, setInvitedAdmins] = useState(['sachin2317u@gmail.com']); 
             
-            // ડેમો ડેટા જેથી ખાલી સ્ક્રીન ન દેખાય 
             const [products, setProducts] = useState([
                 {
-                    id: 'p1', name: '3D Printed Vase', category: 'Decor', price: 499, description: 'ખૂબ જ સુંદર 3D પ્રિન્ટેડ ફ્લાવર વાઝ. તમારા ઘરને સજાવવા માટે ઉત્તમ.',
-                    images: ['https://via.placeholder.com/400/333333/FFFFFF?text=Photo+1', 'https://via.placeholder.com/400/555555/FFFFFF?text=Photo+2', 'https://via.placeholder.com/400/777777/FFFFFF?text=Photo+3'],
+                    id: 'p1', name: '3D Printed Vase', category: 'Decor', price: 499, description: 'ખૂબ જ સુંદર 3D પ્રિન્ટેડ ફ્લાવર વાઝ.',
+                    images: ['https://via.placeholder.com/400/333333/FFFFFF?text=Photo+1', 'https://via.placeholder.com/400/555555/FFFFFF?text=Photo+2'],
                     sizes: [{name: 'Small', price: 499}, {name: 'Large', price: 899}]
-                },
-                {
-                    id: 'p2', name: 'Custom Name Stand', category: 'Gifts', price: 299, description: 'તમારું નામ 3D માં પ્રિન્ટ કરાવો. ઓફિસ ડેસ્ક માટે શ્રેષ્ઠ.',
-                    images: ['https://via.placeholder.com/400/0000FF/FFFFFF?text=Stand+1', 'https://via.placeholder.com/400/0055FF/FFFFFF?text=Stand+2']
                 }
             ]); 
             const [cart, setCart] = useState([]);
@@ -83,12 +76,17 @@
             const removeFromCart = (index) => setCart(prev => prev.filter((_, i) => i !== index));
             const updateQuantity = (index, quantity) => setCart(prev => prev.map((item, i) => i === index ? { ...item, quantity } : item));
             const clearCart = () => setCart([]);
+            
+            // નવું ફંક્શન: ઓર્ડર સ્ટેટસ બદલવા માટે
+            const updateOrderStatus = (orderId, newStatus) => {
+                setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
+            };
 
             return (
                 <AppContext.Provider value={{ 
                     user, setUser, invitedAdmins, setInvitedAdmins,
                     products, setProducts, cart, addToCart, removeFromCart, updateQuantity, clearCart,
-                    orders, setOrders, customRequests, setCustomRequests
+                    orders, setOrders, updateOrderStatus, customRequests, setCustomRequests
                 }}>
                     {children}
                 </AppContext.Provider>
@@ -110,7 +108,6 @@
                             <p className="text-slate-500 mt-1">Discover unique creations</p>
                         </div>
                     </div>
-                    {/* અહી 2 કોલમ સેટ કરેલી છે (grid-cols-2) */}
                     <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
                         {products.length === 0 ? (
                             <div className="col-span-full text-center py-20 bg-white rounded-xl border border-slate-200 text-slate-500">
@@ -124,7 +121,6 @@
             );
         }
 
-        // Product Card (અહી ટચ કરવાથી નવું પેજ ખુલશે)
         function ProductCard({ product, addToCart, setCurrentTab, setSelectedProduct }) {
             const [selectedSizeIndex, setSelectedSizeIndex] = useState(0);
             
@@ -140,7 +136,6 @@
 
             return (
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden group flex flex-col">
-                    {/* ફોટા પર ક્લિક ઇવેન્ટ ઉમેરી */}
                     <div onClick={handleProductClick} className="cursor-pointer aspect-square bg-slate-100 overflow-hidden relative">
                         <img src={mainImage} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                         {product.images && product.images.length > 1 && (
@@ -149,23 +144,15 @@
                     </div>
                     <div className="p-3 sm:p-5 flex-1 flex flex-col">
                         <span className="text-[10px] sm:text-xs font-semibold text-blue-600 uppercase tracking-wider mb-1">{product.category}</span>
-                        {/* નામ પર ક્લિક ઇવેન્ટ ઉમેરી */}
                         <h3 onClick={handleProductClick} className="cursor-pointer font-bold text-sm sm:text-lg text-slate-900 mb-1 line-clamp-1 hover:text-blue-600">{product.name}</h3>
                         
                         {hasSizes && (
                             <div className="mt-2 mb-3">
-                                <select 
-                                    className="w-full border border-slate-300 rounded p-1 text-xs sm:text-sm bg-slate-50 outline-none"
-                                    value={selectedSizeIndex}
-                                    onChange={(e) => setSelectedSizeIndex(e.target.value)}
-                                >
-                                    {product.sizes.map((s, i) => (
-                                        <option key={i} value={i}>{s.name} - ₹{s.price}</option>
-                                    ))}
+                                <select className="w-full border border-slate-300 rounded p-1 text-xs sm:text-sm bg-slate-50 outline-none" value={selectedSizeIndex} onChange={(e) => setSelectedSizeIndex(e.target.value)}>
+                                    {product.sizes.map((s, i) => <option key={i} value={i}>{s.name} - ₹{s.price}</option>)}
                                 </select>
                             </div>
                         )}
-
                         <div className="mt-auto flex items-center justify-between">
                             <span className="text-sm sm:text-xl font-bold text-slate-900">₹{parseFloat(currentPrice).toFixed(2)}</span>
                             <button onClick={() => addToCart(product, currentSize)} className="bg-slate-900 text-white p-2 rounded-lg hover:bg-slate-800 transition-colors flex items-center gap-2">
@@ -177,31 +164,22 @@
             );
         }
 
-        // ==========================================
-        // નવું: PRODUCT DETAILS PAGE (તમારી જરૂરિયાત મુજબ)
-        // ==========================================
         function ProductDetailsPage({ product, setCurrentTab }) {
             const { addToCart } = useStore();
             const [selectedSizeIndex, setSelectedSizeIndex] = useState(0);
 
             if (!product) {
-                setCurrentTab('home');
-                return null;
+                setCurrentTab('home'); return null;
             }
 
             const hasSizes = product.sizes && product.sizes.length > 0;
             const currentSize = hasSizes ? product.sizes[selectedSizeIndex] : { name: 'Standard', price: product.price || 0 };
             const currentPrice = currentSize.price;
-            
-            // જો ૬-૭ ફોટા હોય તો બતાવો, નહીંતર ૧ બતાવો
             const images = product.images && product.images.length > 0 ? product.images : [product.imageUrl || 'https://via.placeholder.com/300'];
-
-            // ગયા મહિનાની ખરીદી માટે રેન્ડમ આંકડો (તમે ભવિષ્યમાં ડેટાબેઝમાંથી લાવી શકો)
             const fakeSales = Math.floor(Math.random() * (150 - 20 + 1)) + 20;
 
             return (
                 <div className="max-w-4xl mx-auto bg-white min-h-screen pb-24 border-x border-slate-100 shadow-sm">
-                    {/* પાછા જવા માટે બટન */}
                     <div className="p-4 border-b flex items-center gap-3 sticky top-0 bg-white z-10 shadow-sm">
                         <button onClick={() => setCurrentTab('home')} className="text-slate-600 p-2 bg-slate-100 rounded-full hover:bg-slate-200">
                             <Icons.ArrowLeft className="w-5 h-5" />
@@ -210,46 +188,29 @@
                     </div>
 
                     <div className="p-4 sm:p-6">
-                        {/* ૧. પ્રોડક્ટનું નામ */}
                         <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mb-2">{product.name}</h2>
-                        
-                        {/* ૨. છેલ્લા મહિનાની ખરીદી */}
                         <p className="text-sm sm:text-base font-bold text-green-600 mb-6 flex items-center gap-2 bg-green-50 p-2 rounded-lg w-max">
                             🔥 ગયા મહિને {fakeSales} લોકોએ આ પ્રોડક્ટ ખરીદી
                         </p>
 
-                        {/* ૩. વચમાં ફોટા (સ્વાઇપ/સ્લાઇડર) */}
                         <div className="flex overflow-x-auto gap-4 snap-x snap-mandatory pb-4 hide-scrollbar">
                             {images.map((img, idx) => (
-                                <img 
-                                    key={idx} 
-                                    src={img} 
-                                    alt={`Slide ${idx}`} 
-                                    className="w-[85%] sm:w-[400px] h-[300px] sm:h-[400px] object-cover rounded-xl snap-center flex-shrink-0 border border-slate-200 shadow-sm" 
-                                />
+                                <img key={idx} src={img} alt={`Slide ${idx}`} className="w-[85%] sm:w-[400px] h-[300px] sm:h-[400px] object-cover rounded-xl snap-center flex-shrink-0 border border-slate-200 shadow-sm" />
                             ))}
                         </div>
                         <p className="text-xs text-slate-400 text-center mt-1 mb-6">(બાજુમાં સ્વાઇપ કરીને બધા ફોટા જુઓ)</p>
 
-                        {/* ૪. પ્રોડક્ટની માહિતી અને ખરીદીનું બટન */}
                         <div className="mt-4">
                             <h3 className="font-bold text-lg border-b pb-2 mb-3">પ્રોડક્ટની માહિતી</h3>
                             <p className="text-slate-600 text-base leading-relaxed mb-6">{product.description || 'આ પ્રોડક્ટ માટે કોઈ વધારાની માહિતી ઉપલબ્ધ નથી.'}</p>
                         </div>
 
-                        {/* સાઇઝ અને કાર્ટ બટનનું બોક્સ */}
                         <div className="mt-6 p-5 bg-slate-50 rounded-xl border border-slate-200 shadow-inner">
                             {hasSizes && (
                                 <div className="mb-4">
                                     <label className="block text-sm font-bold text-slate-700 mb-2">સાઇઝ પસંદ કરો:</label>
-                                    <select 
-                                        className="w-full sm:w-1/2 border border-slate-300 rounded-lg p-3 bg-white outline-none font-medium"
-                                        value={selectedSizeIndex}
-                                        onChange={(e) => setSelectedSizeIndex(e.target.value)}
-                                    >
-                                        {product.sizes.map((s, i) => (
-                                            <option key={i} value={i}>{s.name} - ₹{s.price}</option>
-                                        ))}
+                                    <select className="w-full sm:w-1/2 border border-slate-300 rounded-lg p-3 bg-white outline-none font-medium" value={selectedSizeIndex} onChange={(e) => setSelectedSizeIndex(e.target.value)}>
+                                        {product.sizes.map((s, i) => <option key={i} value={i}>{s.name} - ₹{s.price}</option>)}
                                     </select>
                                 </div>
                             )}
@@ -280,7 +241,16 @@
                 if (cart.length === 0) return;
                 setIsCheckingOut(true);
                 setTimeout(() => {
-                    setOrders(prev => [{ id: 'ORD-' + Date.now(), userId: user.email, address: user, items: [...cart], total, date: new Date().toLocaleDateString() }, ...prev]);
+                    // નવું: ઓર્ડર મુકતી વખતે status 'Pending' સેટ કર્યું છે
+                    setOrders(prev => [{ 
+                        id: 'ORD-' + Date.now(), 
+                        userId: user.email, 
+                        address: user, 
+                        items: [...cart], 
+                        total, 
+                        date: new Date().toLocaleDateString(),
+                        status: 'Pending' // <--- STATUS ADDED HERE
+                    }, ...prev]);
                     clearCart();
                     setSuccess(true);
                     setTimeout(() => setCurrentTab('profile'), 2000);
@@ -363,6 +333,15 @@
             if (!user) { setCurrentTab('auth'); return null; }
             const myOrders = orders.filter(o => o.userId === user.email);
 
+            // યુઝર માટે સ્ટેટસનો મેસેજ નક્કી કરવાનું ફંક્શન
+            const getStatusMessage = (status) => {
+                if(status === 'Pending') return <span className="text-orange-500">⏳ Processing</span>;
+                if(status === 'Confirmed') return <span className="text-blue-600">👍 Confirmed</span>;
+                if(status === 'Shipped') return <span className="text-purple-600">🚚 Your order is on the way</span>;
+                if(status === 'Delivered') return <span className="text-green-600">✅ Delivered</span>;
+                return <span className="text-slate-500">{status}</span>;
+            };
+
             return (
                 <div className="max-w-4xl mx-auto px-4 py-6 pb-24">
                     <div className="flex justify-between items-center mb-8 pb-4 border-b">
@@ -378,12 +357,22 @@
                         <p><strong>Mobile:</strong> {user.mobile}</p>
                         <p className="mt-2 text-sm text-slate-500"><strong>Address:</strong><br/>{user.village}, {user.locality}<br/>{user.stateDistrict} - {user.pincode}<br/>{user.country}</p>
                     </div>
-                    <h2 className="font-bold text-xl mb-4">Order History</h2>
+                    
+                    <h2 className="font-bold text-xl mb-4">Order History (ટ્રેકિંગ)</h2>
                     {myOrders.length === 0 ? <p className="text-slate-500">No orders found.</p> : (
                         <div className="space-y-4">
                             {myOrders.map(o => (
-                                <div key={o.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                                    <div className="flex justify-between font-bold border-b pb-2 mb-2"><span>{o.id}</span><span>{o.date}</span></div>
+                                <div key={o.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm relative">
+                                    <div className="flex justify-between font-bold border-b pb-2 mb-2">
+                                        <span>{o.id}</span>
+                                        <span>{o.date}</span>
+                                    </div>
+                                    
+                                    {/* નવું: યુઝરને અહીં સ્ટેટસ દેખાશે */}
+                                    <div className="mb-3 font-bold text-sm bg-slate-50 p-2 rounded">
+                                        Status: {getStatusMessage(o.status)}
+                                    </div>
+
                                     {o.items.map(i => <div key={i.id} className="flex justify-between text-sm py-1"><span>{i.quantity}x {i.name} ({i.selectedSize?.name})</span><span>₹{(parseFloat(i.selectedSize?.price || i.price) * i.quantity).toFixed(2)}</span></div>)}
                                     <div className="flex justify-between font-bold mt-3 pt-2 border-t"><span>Total</span><span>₹{o.total.toFixed(2)}</span></div>
                                 </div>
@@ -398,7 +387,7 @@
         // ADMIN PANEL
         // ==========================================
         function AdminPage({ setCurrentTab }) {
-            const { user, products, setProducts, orders, invitedAdmins, setInvitedAdmins } = useStore();
+            const { user, products, setProducts, orders, updateOrderStatus, invitedAdmins, setInvitedAdmins } = useStore();
             const [adminTab, setAdminTab] = useState('products'); 
             const [view, setView] = useState('list');
             
@@ -442,10 +431,7 @@
                             reader.readAsDataURL(file);
                         });
                     });
-                    
-                    Promise.all(readers).then(imagesBase64 => {
-                        setFormData(prev => ({ ...prev, images: [...prev.images, ...imagesBase64] }));
-                    });
+                    Promise.all(readers).then(imagesBase64 => setFormData(prev => ({ ...prev, images: [...prev.images, ...imagesBase64] })));
                 }
             };
 
@@ -464,7 +450,6 @@
                 
                 if (formData.id) setProducts(products.map(p => p.id === formData.id ? payload : p));
                 else setProducts([{ ...payload, id: 'p' + Date.now() }, ...products]);
-                
                 setView('list');
             };
 
@@ -475,14 +460,6 @@
                 setView('add');
             };
 
-            const handleInviteAdmin = () => {
-                const newAdmin = prompt("બીજા એડમિનનું ઈમેલ આઇડી નાખો:");
-                if(newAdmin) {
-                    setInvitedAdmins([...invitedAdmins, newAdmin]);
-                    alert(`${newAdmin} ને એડમિન બનાવવામાં આવ્યા છે!`);
-                }
-            };
-
             return (
                 <div className="max-w-5xl mx-auto px-4 py-6 pb-24">
                     <div className="flex items-center justify-between mb-8 pb-4 border-b border-slate-200">
@@ -490,7 +467,6 @@
                             <div className="w-12 h-12 bg-slate-900 text-white rounded-lg flex items-center justify-center"><Icons.LayoutDashboard className="w-6 h-6" /></div>
                             <div><h1 className="text-2xl font-bold text-slate-900">Admin Dashboard</h1></div>
                         </div>
-                        <button onClick={handleInviteAdmin} className="bg-blue-100 text-blue-700 px-4 py-2 rounded-lg font-bold">+ Invite Admin</button>
                     </div>
 
                     <div className="flex gap-4 mb-6">
@@ -498,6 +474,7 @@
                         <button onClick={() => setAdminTab('orders')} className={`px-4 py-2 font-bold rounded-lg ${adminTab === 'orders' ? 'bg-slate-900 text-white' : 'bg-slate-200 text-slate-700'}`}>Customer Orders</button>
                     </div>
 
+                    {/* Products Tab */}
                     {adminTab === 'products' && (
                         <div>
                             <div className="flex justify-end mb-4">
@@ -524,12 +501,7 @@
                                                     </td>
                                                     <td className="px-6 py-4 font-medium">₹{p.price.toFixed(2)}</td>
                                                     <td className="px-6 py-4 text-right">
-                                                        <button onClick={() => { 
-                                                            setFormData(p); 
-                                                            setSizes(p.sizes || [{name: '', price: ''}]);
-                                                            setSizeCount(p.sizes?.length || 1);
-                                                            setView('edit'); 
-                                                        }} className="p-2 text-slate-400 hover:text-blue-600"><Icons.Edit className="w-5 h-5" /></button>
+                                                        <button onClick={() => { setFormData(p); setSizes(p.sizes || [{name: '', price: ''}]); setSizeCount(p.sizes?.length || 1); setView('edit'); }} className="p-2 text-slate-400 hover:text-blue-600"><Icons.Edit className="w-5 h-5" /></button>
                                                         <button onClick={() => handleDelete(p.id)} className="p-2 text-slate-400 hover:text-red-600"><Icons.Trash2 className="w-5 h-5" /></button>
                                                     </td>
                                                 </tr>
@@ -573,12 +545,8 @@
                                             {sizes.map((size, idx) => (
                                                 <div key={idx} className="flex gap-4 items-center bg-slate-50 p-3 rounded border">
                                                     <span className="font-bold text-slate-500 w-6">{idx + 1}.</span>
-                                                    <div className="flex-1">
-                                                        <input type="text" placeholder="સાઇઝનું નામ (દા.ત. Size 1)" required className="w-full p-2 border rounded" value={size.name} onChange={(e) => handleSizeInput(idx, 'name', e.target.value)} />
-                                                    </div>
-                                                    <div className="flex-1">
-                                                        <input type="number" step="0.01" placeholder="કિંમત (₹)" required className="w-full p-2 border rounded" value={size.price} onChange={(e) => handleSizeInput(idx, 'price', e.target.value)} />
-                                                    </div>
+                                                    <div className="flex-1"><input type="text" placeholder="સાઇઝનું નામ (દા.ત. Size 1)" required className="w-full p-2 border rounded" value={size.name} onChange={(e) => handleSizeInput(idx, 'name', e.target.value)} /></div>
+                                                    <div className="flex-1"><input type="number" step="0.01" placeholder="કિંમત (₹)" required className="w-full p-2 border rounded" value={size.price} onChange={(e) => handleSizeInput(idx, 'price', e.target.value)} /></div>
                                                 </div>
                                             ))}
                                         </div>
@@ -588,20 +556,57 @@
                             )}
                         </div>
                     )}
+                    
+                    {/* Orders Tab */}
                     {adminTab === 'orders' && (
                         <div className="space-y-4">
                             {orders.length === 0 ? <p className="text-slate-500 bg-white p-6 border rounded-xl">હજુ કોઈ ઓર્ડર મળ્યા નથી.</p> : (
                                 orders.map(o => (
-                                    <div key={o.id} className="bg-white p-4 rounded-xl border shadow-sm">
-                                        <div className="flex justify-between font-bold border-b pb-2 mb-2"><span>Order: {o.id}</span><span className="text-blue-600">₹{o.total.toFixed(2)}</span></div>
-                                        <p className="text-sm font-bold mt-2">Customer Details:</p>
-                                        <p className="text-sm text-slate-600">Name: {o.address?.name}<br/>Mobile: {o.address?.mobile}</p>
-                                        <p className="text-sm font-bold mt-2">Delivery Address:</p>
-                                        <p className="text-sm text-slate-600 bg-slate-50 p-2 rounded">
-                                            {o.address?.village}, {o.address?.locality}<br/>
-                                            {o.address?.stateDistrict} - {o.address?.pincode}<br/>
-                                            {o.address?.country}
-                                        </p>
+                                    <div key={o.id} className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                                        <div className="flex justify-between font-bold border-b pb-2 mb-2">
+                                            <span>Order: {o.id}</span>
+                                            <span className="text-blue-600">₹{o.total.toFixed(2)}</span>
+                                        </div>
+                                        
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                            <div>
+                                                <p className="text-sm font-bold text-slate-700">Customer Details:</p>
+                                                <p className="text-sm text-slate-600">Name: {o.address?.name}<br/>Mobile: {o.address?.mobile}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-sm font-bold text-slate-700">Delivery Address:</p>
+                                                <p className="text-sm text-slate-600 bg-slate-50 p-2 rounded border">
+                                                    {o.address?.village}, {o.address?.locality}<br/>
+                                                    {o.address?.stateDistrict} - {o.address?.pincode}<br/>
+                                                    {o.address?.country}
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        {/* નવું: ઓર્ડરમાં ક્વોન્ટિટી સ્પષ્ટ બતાવે છે */}
+                                        <div className="mt-4 p-3 bg-blue-50 border border-blue-100 rounded-lg">
+                                            <p className="font-bold text-blue-900 border-b border-blue-200 pb-1 mb-2">Items to Pack (ક્વોન્ટિટી):</p>
+                                            {o.items.map((item, idx) => (
+                                                <div key={idx} className="flex justify-between text-sm py-1 font-medium text-slate-800">
+                                                    <span>➡️ {item.quantity} x {item.name} ({item.selectedSize?.name})</span>
+                                                    <span>₹{(parseFloat(item.selectedSize?.price || item.price) * item.quantity).toFixed(2)}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+
+                                        {/* નવું: સ્ટેટસ બદલવાના એક્શન બટન્સ */}
+                                        <div className="mt-4 flex flex-col sm:flex-row items-center justify-between border-t pt-4 gap-4">
+                                            <div className={`text-sm font-bold px-3 py-1.5 rounded-full border ${o.status === 'Pending' ? 'bg-orange-50 text-orange-600 border-orange-200' : o.status === 'Confirmed' ? 'bg-blue-50 text-blue-600 border-blue-200' : o.status === 'Shipped' ? 'bg-purple-50 text-purple-600 border-purple-200' : 'bg-green-50 text-green-600 border-green-200'}`}>
+                                                Status: {o.status}
+                                            </div>
+                                            
+                                            <div className="flex gap-2 w-full sm:w-auto">
+                                                {o.status === 'Pending' && <button onClick={() => updateOrderStatus(o.id, 'Confirmed')} className="flex-1 sm:flex-none bg-blue-600 text-white font-bold text-sm px-4 py-2 rounded-lg shadow hover:bg-blue-700 transition">Confirm Order</button>}
+                                                {o.status === 'Confirmed' && <button onClick={() => updateOrderStatus(o.id, 'Shipped')} className="flex-1 sm:flex-none bg-purple-600 text-white font-bold text-sm px-4 py-2 rounded-lg shadow hover:bg-purple-700 transition">Pack & Ship</button>}
+                                                {o.status === 'Shipped' && <button onClick={() => updateOrderStatus(o.id, 'Delivered')} className="flex-1 sm:flex-none bg-green-600 text-white font-bold text-sm px-4 py-2 rounded-lg shadow hover:bg-green-700 transition">Mark Delivered</button>}
+                                            </div>
+                                        </div>
+
                                     </div>
                                 ))
                             )}
@@ -624,32 +629,25 @@
                 e.preventDefault();
                 setError('');
                 if (!isLogin && formData.password !== formData.confirmPassword) {
-                    setError('પાસવર્ડ અને કન્ફર્મ પાસવર્ડ મેચ થતા નથી!');
-                    return;
+                    setError('પાસવર્ડ અને કન્ફર્મ પાસવર્ડ મેચ થતા નથી!'); return;
                 }
                 if (!window.fbAuth || !window.auth) {
-                    alert("સિસ્ટમ લોડ થઈ રહી છે, કૃપા કરીને એક સેકન્ડ પછી ફરી પ્રયાસ કરો.");
-                    return;
+                    alert("સિસ્ટમ લોડ થઈ રહી છે, કૃપા કરીને એક સેકન્ડ પછી ફરી પ્રયાસ કરો."); return;
                 }
                 if (isLogin) {
                     try {
                         const userCredential = await window.fbAuth.signInWithEmailAndPassword(window.auth, formData.email, formData.password);
                         setUser({ email: userCredential.user.email, ...formData });
                         setCurrentTab('home');
-                    } catch (error) {
-                        setError('ખોટો ઇમેઇલ અથવા પાસવર્ડ! કૃપા કરીને ફરી પ્રયાસ કરો.');
-                    }
+                    } catch (error) { setError('ખોટો ઇમેઇલ અથવા પાસવર્ડ! કૃપા કરીને ફરી પ્રયાસ કરો.'); }
                 } else {
                     try {
                         const userCredential = await window.fbAuth.createUserWithEmailAndPassword(window.auth, formData.email, formData.password);
                         setUser({ email: userCredential.user.email, ...formData });
                         setCurrentTab('home');
                     } catch (error) {
-                        if (error.code === 'auth/email-already-in-use') {
-                            setError('આ ઇમેઇલ આઇડી પહેલેથી રજીસ્ટર થયેલું છે.');
-                        } else {
-                            setError('ભૂલ: ' + error.message);
-                        }
+                        if (error.code === 'auth/email-already-in-use') setError('આ ઇમેઇલ આઇડી પહેલેથી રજીસ્ટર થયેલું છે.');
+                        else setError('ભૂલ: ' + error.message);
                     }
                 }
             };
@@ -675,9 +673,7 @@
                         <div className="text-sm font-bold text-slate-700 mt-4 border-b pb-1">લોગિન માહિતી</div>
                         <input type="email" placeholder="Email" required className="w-full p-2 border rounded" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
                         <input type="password" placeholder="Password" required className="w-full p-2 border rounded" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} />
-                        {!isLogin && (
-                            <input type="password" placeholder="Confirm Password" required className="w-full p-2 border rounded" value={formData.confirmPassword} onChange={e => setFormData({...formData, confirmPassword: e.target.value})} />
-                        )}
+                        {!isLogin && <input type="password" placeholder="Confirm Password" required className="w-full p-2 border rounded" value={formData.confirmPassword} onChange={e => setFormData({...formData, confirmPassword: e.target.value})} />}
                         <button type="submit" className="w-full bg-blue-600 text-white font-medium py-2 rounded-md mt-4">{isLogin ? 'Sign In' : 'Sign Up'}</button>
                     </form>
                     <div className="mt-6 text-center text-sm text-slate-600">
@@ -687,14 +683,9 @@
             );
         }
 
-        // ==========================================
-        // MAIN APP COMPONENT
-        // ==========================================
         function App() {
             const { user, cart, invitedAdmins } = useStore();
             const [currentTab, setCurrentTab] = useState('home');
-            
-            // નવું: કઈ પ્રોડક્ટ પર ક્લિક કર્યું છે તે યાદ રાખવા માટેનું સ્ટેટ
             const [selectedProduct, setSelectedProduct] = useState(null); 
             
             const cartItemsCount = cart.reduce((acc, item) => acc + item.quantity, 0);
@@ -719,12 +710,8 @@
                     </header>
                     
                     <main>
-                        {/* મેં અહીં setSelectedProduct પાસ કર્યું છે જેથી હોમ પેજ પરથી ક્લિક કરી શકાય */}
                         {currentTab === 'home' && <HomePage setCurrentTab={setCurrentTab} setSelectedProduct={setSelectedProduct} />}
-                        
-                        {/* અહીં આપણું નવું ડિટેલ્સ પેજ ખુલશે */}
                         {currentTab === 'details' && <ProductDetailsPage product={selectedProduct} setCurrentTab={setCurrentTab} />}
-                        
                         {currentTab === 'cart' && <CartPage setCurrentTab={setCurrentTab} />}
                         {currentTab === 'custom' && <CustomRequestPage setCurrentTab={setCurrentTab} />}
                         {currentTab === 'profile' && <ProfilePage setCurrentTab={setCurrentTab} />}
