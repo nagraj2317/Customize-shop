@@ -40,7 +40,7 @@
         window.fb = { collection, doc, setDoc, deleteDoc, onSnapshot };
         window.fbAuth = { signInWithEmailAndPassword, createUserWithEmailAndPassword };
         
-        console.log("Firebase initialized on window.");
+        console.log("Firebase initialized successfully.");
     </script>
 </head>
 <body>
@@ -85,6 +85,7 @@
             const [invitedAdmins, setInvitedAdmins] = useState(['sachin2317u@gmail.com']); 
             const [products, setProducts] = useState([]); 
             const [orders, setOrders] = useState([]);
+            const [customRequests, setCustomRequests] = useState([]);
             const [cart, setCart] = useState(() => {
                 const saved = localStorage.getItem('app_cart');
                 return saved ? JSON.parse(saved) : [];
@@ -122,9 +123,17 @@
                     setOrders(ords);
                 });
 
+                const unsubRequests = window.fb.onSnapshot(window.fb.collection(window.db, "customRequests"), (snapshot) => {
+                    const reqs = [];
+                    snapshot.forEach(doc => reqs.push(doc.data()));
+                    reqs.sort((a, b) => b.id.localeCompare(a.id));
+                    setCustomRequests(reqs);
+                });
+
                 return () => {
                     unsubProducts();
                     unsubOrders();
+                    unsubRequests();
                 };
             }, [isFirebaseReady]);
 
@@ -149,9 +158,32 @@
                     await window.fb.setDoc(window.fb.doc(window.db, "orders", orderId), updated);
                 }
             };
+
+            // CRITICAL SYSTEM FIX: Soft Delete Order so History remains Permanent for users
             const deleteOrder = async (orderId) => {
                 if (!isFirebaseReady) return;
-                await window.fb.deleteDoc(window.fb.doc(window.db, "orders", orderId));
+                const order = orders.find(o => o.id === orderId);
+                if (!order) return;
+
+                // Rule 1: If Shipped or Delivered, do not change anything or alert admin
+                if (order.status === 'Shipped' || order.status === 'Delivered') {
+                    alert("This order is already shipped or delivered. It cannot be cancelled or removed.");
+                    return;
+                }
+                
+                // Rule 2: If Pending or Confirmed, change status to 'Cancelled' inside Database permanently
+                const updated = { ...order, status: 'Cancelled' };
+                await window.fb.setDoc(window.fb.doc(window.db, "orders", orderId), updated);
+                alert("Order marked as Cancelled successfully.");
+            };
+
+            const addCustomRequest = async (req) => {
+                if (!isFirebaseReady) return;
+                await window.fb.setDoc(window.fb.doc(window.db, "customRequests", req.id), req);
+            };
+            const deleteCustomRequest = async (id) => {
+                if (!isFirebaseReady) return;
+                await window.fb.deleteDoc(window.fb.doc(window.db, "customRequests", id));
             };
 
             const addToCart = (product, selectedSize) => {
@@ -171,7 +203,6 @@
                         <div className="text-center">
                             <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
                             <p className="text-slate-600 font-bold text-lg">Loading Store...</p>
-                            <p className="text-slate-400 text-sm mt-2">Connecting to database securely</p>
                         </div>
                     </div>
                 );
@@ -182,7 +213,8 @@
                     user, setUser, invitedAdmins, setInvitedAdmins,
                     products, addOrUpdateProduct, deleteProduct, 
                     cart, addToCart, removeFromCart, updateQuantity, clearCart,
-                    orders, addOrder, updateOrderStatus, deleteOrder
+                    orders, addOrder, updateOrderStatus, deleteOrder,
+                    customRequests, addCustomRequest, deleteCustomRequest
                 }}>
                     {children}
                 </AppContext.Provider>
@@ -197,11 +229,9 @@
             const { products, addToCart } = useStore();
             return (
                 <div className="max-w-7xl mx-auto px-4 py-6 pb-24">
-                    <div className="flex justify-between items-center mb-8">
-                        <div>
-                            <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Customize shop</h1>
-                            <p className="text-slate-500 mt-1">Discover unique creations</p>
-                        </div>
+                    <div className="mb-8">
+                        <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Customize shop</h1>
+                        <p className="text-slate-500 mt-1">Discover unique creations</p>
                     </div>
                     <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
                         {products.length === 0 ? (
@@ -232,14 +262,10 @@
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden group flex flex-col">
                     <div onClick={handleProductClick} className="cursor-pointer aspect-square bg-slate-100 overflow-hidden relative">
                         <img src={mainImage} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                        {product.images && product.images.length > 1 && (
-                            <div className="absolute bottom-1 right-1 bg-black/60 text-white text-[10px] px-2 py-1 rounded">+{product.images.length - 1} Photos</div>
-                        )}
                     </div>
                     <div className="p-3 sm:p-5 flex-1 flex flex-col">
-                        <span className="text-[10px] sm:text-xs font-semibold text-blue-600 uppercase tracking-wider mb-1">{product.category}</span>
+                        <span className="text-[10px] sm:text-xs font-semibold text-blue-600 uppercase mb-1">{product.category}</span>
                         <h3 onClick={handleProductClick} className="cursor-pointer font-bold text-sm sm:text-lg text-slate-900 mb-1 line-clamp-1 hover:text-blue-600">{product.name}</h3>
-                        
                         {hasSizes && (
                             <div className="mt-2 mb-3">
                                 <select className="w-full border border-slate-300 rounded p-1 text-xs sm:text-sm bg-slate-50 outline-none" value={selectedSizeIndex} onChange={(e) => setSelectedSizeIndex(e.target.value)}>
@@ -249,7 +275,7 @@
                         )}
                         <div className="mt-auto flex items-center justify-between">
                             <span className="text-sm sm:text-xl font-bold text-slate-900">₹{parseFloat(currentPrice).toFixed(2)}</span>
-                            <button onClick={() => addToCart(product, currentSize)} className="bg-slate-900 text-white p-2 rounded-lg hover:bg-slate-800 transition-colors flex items-center gap-2">
+                            <button onClick={() => addToCart(product, currentSize)} className="bg-slate-900 text-white p-2 rounded-lg hover:bg-slate-800 transition-colors">
                                 <Icons.ShoppingCart className="w-4 h-4 sm:w-5 sm:h-5" />
                             </button>
                         </div>
@@ -262,20 +288,10 @@
             const { addToCart } = useStore();
             const [selectedSizeIndex, setSelectedSizeIndex] = useState(0);
 
-            if (!product) {
-                return (
-                    <div className="max-w-4xl mx-auto p-10 text-center">
-                        <p className="text-slate-500 mb-4 text-lg">Product details not found.</p>
-                        <button onClick={() => setCurrentTab('home')} className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold">Go Back Home</button>
-                    </div>
-                );
-            }
-
+            if (!product) return null;
             const hasSizes = product.sizes && product.sizes.length > 0;
             const currentSize = hasSizes ? product.sizes[selectedSizeIndex] : { name: 'Standard', price: product.price || 0 };
-            const currentPrice = currentSize.price;
-            const images = product.images && product.images.length > 0 ? product.images : [product.imageUrl || 'https://via.placeholder.com/300?text=No+Image'];
-            const fakeSales = Math.floor(Math.random() * (150 - 20 + 1)) + 20;
+            const images = product.images && product.images.length > 0 ? product.images : ['https://via.placeholder.com/300?text=No+Image'];
 
             return (
                 <div className="max-w-4xl mx-auto bg-white min-h-screen pb-24 border-x border-slate-100 shadow-sm">
@@ -286,39 +302,107 @@
                         <h1 className="text-lg font-bold line-clamp-1">{product.name}</h1>
                     </div>
                     <div className="p-4 sm:p-6">
-                        <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mb-2">{product.name}</h2>
-                        <p className="text-sm sm:text-base font-bold text-green-600 mb-6 flex items-center gap-2 bg-green-50 p-2 rounded-lg w-max">
-                            🔥 {fakeSales} people bought this last month
-                        </p>
+                        <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mb-4">{product.name}</h2>
                         <div className="flex overflow-x-auto gap-4 snap-x snap-mandatory pb-4 hide-scrollbar">
                             {images.map((img, idx) => (
-                                <img key={idx} src={img} alt={`Slide ${idx}`} className="w-[85%] sm:w-[400px] h-[300px] sm:h-[400px] object-cover rounded-xl snap-center flex-shrink-0 border border-slate-200 shadow-sm" />
+                                <img key={idx} src={img} className="w-[85%] sm:w-[400px] h-[300px] sm:h-[400px] object-cover rounded-xl border snap-center flex-shrink-0" />
                             ))}
                         </div>
-                        <p className="text-xs text-slate-400 text-center mt-1 mb-6">(Swipe sideways to view all photos)</p>
                         <div className="mt-4">
-                            <h3 className="font-bold text-lg border-b pb-2 mb-3">Product Information</h3>
-                            <p className="text-slate-600 text-base leading-relaxed mb-6">{product.description || 'No additional information available for this product.'}</p>
+                            <h3 className="font-bold text-lg border-b pb-2 mb-3">Description</h3>
+                            <p className="text-slate-600 text-base leading-relaxed mb-6">{product.description}</p>
                         </div>
-                        <div className="mt-6 p-5 bg-slate-50 rounded-xl border border-slate-200 shadow-inner">
+                        <div className="mt-6 p-5 bg-slate-50 rounded-xl border">
                             {hasSizes && (
                                 <div className="mb-4">
                                     <label className="block text-sm font-bold text-slate-700 mb-2">Select Size:</label>
-                                    <select className="w-full sm:w-1/2 border border-slate-300 rounded-lg p-3 bg-white outline-none font-medium" value={selectedSizeIndex} onChange={(e) => setSelectedSizeIndex(e.target.value)}>
+                                    <select className="w-full sm:w-1/2 border border-slate-300 rounded-lg p-3 bg-white" value={selectedSizeIndex} onChange={(e) => setSelectedSizeIndex(e.target.value)}>
                                         {product.sizes.map((s, i) => <option key={i} value={i}>{s.name} - ₹{s.price}</option>)}
                                     </select>
                                 </div>
                             )}
-                            <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-200">
+                            <div className="flex items-center justify-between mt-4 pt-4 border-t">
                                 <div>
                                     <p className="text-sm text-slate-500">Total Price</p>
-                                    <span className="text-3xl font-black text-slate-900">₹{parseFloat(currentPrice).toFixed(2)}</span>
+                                    <span className="text-3xl font-black text-slate-900">₹{parseFloat(currentSize.price).toFixed(2)}</span>
                                 </div>
                                 <button onClick={() => { addToCart(product, currentSize); alert('Successfully added to cart!'); }} className="bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 font-bold flex items-center gap-2 shadow-lg">
                                     <Icons.ShoppingCart className="w-5 h-5" /> Add to Cart
                                 </button>
                             </div>
                         </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function CustomRequestPage({ setCurrentTab }) {
+            const { user, addCustomRequest } = useStore();
+            const [modelName, setModelName] = useState('');
+            const [instructions, setInstructions] = useState('');
+            const [image, setImage] = useState('');
+            const [submitting, setSubmitting] = useState(false);
+
+            const handleImageUpload = (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onloadend = () => setImage(reader.result);
+                    reader.readAsDataURL(file);
+                }
+            };
+
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                if (!user) { setCurrentTab('auth'); return; }
+                setSubmitting(true);
+
+                const requestPayload = {
+                    id: 'REQ-' + Date.now(),
+                    userId: user.email,
+                    userName: user.name,
+                    userMobile: user.mobile,
+                    modelName,
+                    instructions,
+                    image,
+                    date: new Date().toLocaleDateString(),
+                    status: 'Pending'
+                };
+
+                addCustomRequest(requestPayload).then(() => {
+                    alert('Your custom 3D request submitted successfully!');
+                    setModelName('');
+                    setInstructions('');
+                    setImage('');
+                    setSubmitting(false);
+                    setCurrentTab('profile');
+                });
+            };
+
+            return (
+                <div className="max-w-2xl mx-auto px-4 py-6 pb-24">
+                    <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                        <h1 className="text-3xl font-bold text-slate-900 mb-2 text-center">Custom 3D Print Request</h1>
+                        <p className="text-slate-500 text-sm mb-6 text-center">Upload your design idea and requirements, and we will get back to you with price estimation.</p>
+                        
+                        <form onSubmit={handleSubmit} className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-bold text-slate-700 mb-1">Model Name / Idea Title</label>
+                                <input type="text" placeholder="e.g., Custom Iron Man Helmet" required className="w-full p-2 border rounded" value={modelName} onChange={e => setModelName(e.target.value)} />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-bold text-slate-700 mb-1">Detailed Instructions (Size, Color, Material)</label>
+                                <textarea rows="4" placeholder="Mention specific details like height in cm..." required className="w-full p-2 border rounded" value={instructions} onChange={e => setInstructions(e.target.value)} />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-bold text-slate-700 mb-1">Reference Image / Design Snapshot</label>
+                                <input type="file" accept="image/*" required className="w-full p-2 border bg-slate-50 rounded" onChange={handleImageUpload} />
+                                {image && <img src={image} className="mt-3 w-32 h-32 object-cover border rounded-lg shadow-sm" />}
+                            </div>
+                            <button type="submit" disabled={submitting} className="w-full py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition">
+                                {submitting ? 'Submitting...' : 'Submit Custom Request'}
+                            </button>
+                        </form>
                     </div>
                 </div>
             );
@@ -417,15 +501,6 @@
             );
         }
 
-        function CustomRequestPage() {
-            return (
-                <div className="max-w-2xl mx-auto px-4 py-6 pb-24 text-center">
-                    <h1 className="text-3xl font-bold text-slate-900 mb-4">Custom Request</h1>
-                    <p className="text-slate-500">Feature disabled for update.</p>
-                </div>
-            );
-        }
-
         function ProfilePage({ setCurrentTab }) {
             const { user, setUser, orders } = useStore();
             if (!user) {
@@ -437,11 +512,14 @@
                 );
             }
             const myOrders = orders.filter(o => o.userId === user.email);
+
+            // Updated Visual Badge system based on your requirement
             const getStatusMessage = (status) => {
-                if(status === 'Pending') return <span className="text-orange-500">⏳ Processing</span>;
-                if(status === 'Confirmed') return <span className="text-blue-600">👍 Confirmed</span>;
-                if(status === 'Shipped') return <span className="text-purple-600">🚚 Your order is on the way</span>;
-                if(status === 'Delivered') return <span className="text-green-600">✅ Delivered</span>;
+                if(status === 'Pending') return <span className="text-orange-500 bg-orange-50 px-2 py-0.5 rounded font-bold">⏳ Processing</span>;
+                if(status === 'Confirmed') return <span className="text-blue-600 bg-blue-50 px-2 py-0.5 rounded font-bold">👍 Confirmed</span>;
+                if(status === 'Shipped') return <span className="text-purple-600 bg-purple-50 px-2 py-0.5 rounded font-bold">🚚 On The Way</span>;
+                if(status === 'Delivered') return <span className="text-green-600 bg-green-50 px-2 py-0.5 rounded font-bold">✅ Delivered</span>;
+                if(status === 'Cancelled') return <span className="text-red-600 bg-red-50 px-2 py-0.5 rounded font-bold">❌ Cancelled by Admin</span>;
                 return <span className="text-slate-500">{status}</span>;
             };
 
@@ -453,27 +531,22 @@
                             <Icons.LogOut className="w-5 h-5" /> Logout
                         </button>
                     </div>
-                    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 mb-8">
+                    <div className="bg-white p-6 rounded-xl border border-slate-200 mb-8 shadow-sm">
                         <h2 className="font-bold text-lg mb-4">Account Details</h2>
                         <p><strong>Name:</strong> {user.name}</p>
                         <p><strong>Email:</strong> {user.email}</p>
                         <p><strong>Mobile:</strong> {user.mobile}</p>
-                        <p className="mt-2 text-sm text-slate-500"><strong>Address:</strong><br/>{user.village}, {user.locality}<br/>{user.stateDistrict} - {user.pincode}<br/>{user.country}</p>
+                        <p className="mt-2 text-sm text-slate-500"><strong>Address:</strong><br/>{user.village}, {user.locality}<br/>{user.stateDistrict} - {user.pincode}</p>
                     </div>
-                    <h2 className="font-bold text-xl mb-4">Order History (Tracking)</h2>
+                    <h2 className="font-bold text-xl mb-4">Order History (Permanent)</h2>
                     {myOrders.length === 0 ? <p className="text-slate-500">No orders found.</p> : (
                         <div className="space-y-4">
                             {myOrders.map(o => (
-                                <div key={o.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm relative">
-                                    <div className="flex justify-between font-bold border-b pb-2 mb-2">
-                                        <span>{o.id}</span>
-                                        <span>{o.date}</span>
-                                    </div>
-                                    <div className="mb-3 font-bold text-sm bg-slate-50 p-2 rounded">
-                                        Status: {getStatusMessage(o.status)}
-                                    </div>
-                                    {o.items.map((i, idx) => <div key={idx} className="flex justify-between text-sm py-1"><span>{i.quantity}x {i.name} ({i.selectedSize?.name})</span><span>₹{(parseFloat(i.selectedSize?.price || i.price) * i.quantity).toFixed(2)}</span></div>)}
-                                    <div className="flex justify-between font-bold mt-3 pt-2 border-t"><span>Total</span><span>₹{o.total.toFixed(2)}</span></div>
+                                <div key={o.id} className="bg-white p-4 rounded-xl border shadow-sm">
+                                    <div className="flex justify-between font-bold border-b pb-2 mb-2"><span>{o.id}</span><span>{o.date}</span></div>
+                                    <div className="mb-2 text-sm font-semibold p-1.5 rounded">Status: {getStatusMessage(o.status)}</div>
+                                    {o.items.map((i, idx) => <div key={idx} className="flex justify-between text-sm py-1"><span>{i.quantity}x {i.name}</span><span>₹{(parseFloat(i.selectedSize?.price || i.price) * i.quantity).toFixed(2)}</span></div>)}
+                                    <div className="flex justify-between font-bold mt-2 pt-2 border-t"><span>Total</span><span>₹o.total.toFixed(2)</span></div>
                                 </div>
                             ))}
                         </div>
@@ -483,7 +556,7 @@
         }
 
         function AdminPage({ setCurrentTab }) {
-            const { user, products, addOrUpdateProduct, deleteProduct, orders, updateOrderStatus, deleteOrder, invitedAdmins } = useStore();
+            const { user, products, addOrUpdateProduct, deleteProduct, orders, updateOrderStatus, deleteOrder, customRequests, deleteCustomRequest, invitedAdmins } = useStore();
             const [adminTab, setAdminTab] = useState('products'); 
             const [view, setView] = useState('list');
             const [formData, setFormData] = useState({ id:'', name: '', description: '', category: '', images: [] });
@@ -492,10 +565,7 @@
 
             if (!user || !invitedAdmins.includes(user.email)) {
                 return (
-                    <div className="max-w-md mx-auto p-10 text-center">
-                        <p className="text-red-500 font-bold mb-4 text-lg">Access Denied. Admin privileges required.</p>
-                        <button onClick={() => setCurrentTab('home')} className="bg-slate-900 text-white px-6 py-2 rounded-lg font-bold">Return Home</button>
-                    </div>
+                    <div className="max-w-md mx-auto p-10 text-center"><p className="text-red-500 font-bold">Access Denied.</p></div>
                 );
             }
 
@@ -506,9 +576,7 @@
                     const newSizes = [...prev];
                     if (count > newSizes.length) {
                         for (let i = newSizes.length; i < count; i++) newSizes.push({ name: '', price: '' });
-                    } else if (count < newSizes.length) {
-                        newSizes.length = count; 
-                    }
+                    } else if (count < newSizes.length) { newSizes.length = count; }
                     return newSizes;
                 });
             };
@@ -535,70 +603,42 @@
                 }
             };
 
-            const removeImage = (index) => {
-                setFormData(prev => {
-                    const newImages = [...prev.images];
-                    newImages.splice(index, 1);
-                    return { ...prev, images: newImages };
-                });
-            };
-
             const handleSave = (e) => {
                 e.preventDefault();
                 const formattedSizes = sizes.map(s => ({ name: s.name, price: parseFloat(s.price) || 0 }));
-                const basePrice = formattedSizes.length > 0 ? formattedSizes[0].price : 0; 
-                const payload = { ...formData, sizes: formattedSizes, price: basePrice };
+                const payload = { ...formData, sizes: formattedSizes, price: formattedSizes[0]?.price || 0 };
                 if (!formData.id) payload.id = 'p' + Date.now();
                 addOrUpdateProduct(payload).then(() => setView('list'));
             };
 
-            const resetForm = () => {
-                setFormData({ id:'', name: '', description: '', category: '', images: [] });
-                setSizeCount(1);
-                setSizes([{ name: '', price: '' }]);
-                setView('add');
-            };
-
             return (
                 <div className="max-w-5xl mx-auto px-4 py-6 pb-24">
-                    <div className="flex items-center justify-between mb-8 pb-4 border-b border-slate-200">
-                        <div className="flex items-center gap-3">
-                            <div className="w-12 h-12 bg-slate-900 text-white rounded-lg flex items-center justify-center"><Icons.LayoutDashboard className="w-6 h-6" /></div>
-                            <div><h1 className="text-2xl font-bold text-slate-900">Admin Dashboard</h1></div>
-                        </div>
-                    </div>
-                    <div className="flex gap-4 mb-6">
-                        <button onClick={() => setAdminTab('products')} className={`px-4 py-2 font-bold rounded-lg ${adminTab === 'products' ? 'bg-slate-900 text-white' : 'bg-slate-200 text-slate-700'}`}>Products</button>
-                        <button onClick={() => setAdminTab('orders')} className={`px-4 py-2 font-bold rounded-lg ${adminTab === 'orders' ? 'bg-slate-900 text-white' : 'bg-slate-200 text-slate-700'}`}>Customer Orders</button>
+                    <h1 className="text-2xl font-bold text-slate-900 mb-6">Admin Dashboard</h1>
+                    <div className="flex gap-2 mb-6 overflow-x-auto pb-2 hide-scrollbar">
+                        <button onClick={() => setAdminTab('products')} className={`px-4 py-2 font-bold text-sm rounded-lg flex-shrink-0 ${adminTab === 'products' ? 'bg-slate-900 text-white' : 'bg-slate-200'}`}>Products</button>
+                        <button onClick={() => setAdminTab('orders')} className={`px-4 py-2 font-bold text-sm rounded-lg flex-shrink-0 ${adminTab === 'orders' ? 'bg-slate-900 text-white' : 'bg-slate-200'}`}>Orders</button>
+                        <button onClick={() => setAdminTab('customReqs')} className={`px-4 py-2 font-bold text-sm rounded-lg flex-shrink-0 ${adminTab === 'customReqs' ? 'bg-slate-900 text-white' : 'bg-slate-200'}`}>Custom Requests ({customRequests.length})</button>
                     </div>
 
                     {adminTab === 'products' && (
                         <div>
                             <div className="flex justify-end mb-4">
-                                {view === 'list' ? (
-                                    <button onClick={resetForm} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg font-medium"><Icons.Plus className="w-5 h-5" /> Add Product</button>
-                                ) : (
-                                    <button onClick={() => setView('list')} className="flex items-center gap-2 text-slate-600 font-medium"><Icons.ArrowLeft className="w-5 h-5" /> Back</button>
-                                )}
+                                {view === 'list' ? <button onClick={() => setView('add')} className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium">+ Add Product</button> : <button onClick={() => setView('list')} className="text-slate-600 font-medium">Back</button>}
                             </div>
                             {view === 'list' && (
-                                <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                                <div className="bg-white border rounded-xl overflow-hidden shadow-sm">
                                     <table className="w-full text-left text-sm text-slate-600">
-                                        <thead className="bg-slate-50 border-b text-slate-700">
-                                            <tr><th className="px-6 py-4">Product</th><th className="px-6 py-4">Price</th><th className="px-6 py-4 text-right">Actions</th></tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-slate-200">
-                                            {products.length === 0 && <tr><td colSpan="3" className="text-center py-6">No products found.</td></tr>}
+                                        <thead className="bg-slate-50 border-b"><tr><th className="px-6 py-4">Product</th><th className="px-6 py-4">Price</th><th className="px-6 py-4 text-right">Actions</th></tr></thead>
+                                        <tbody className="divide-y">
                                             {products.map(p => (
-                                                <tr key={p.id} className="hover:bg-slate-50">
+                                                <tr key={p.id}>
                                                     <td className="px-6 py-4 flex gap-4 items-center">
-                                                        <img src={p.images && p.images[0] ? p.images[0] : (p.imageUrl || 'https://via.placeholder.com/100?text=No+Image')} className="w-12 h-12 rounded object-cover border" />
-                                                        <div><p className="font-medium text-slate-900">{p.name}</p><p className="text-xs line-clamp-1">{p.category}</p></div>
+                                                        <img src={p.images?.[0] || 'https://via.placeholder.com/100'} className="w-12 h-12 object-cover border rounded" />
+                                                        <div><p className="font-medium text-slate-900">{p.name}</p></div>
                                                     </td>
                                                     <td className="px-6 py-4 font-medium">₹{(p.price || 0).toFixed(2)}</td>
                                                     <td className="px-6 py-4 text-right">
-                                                        <button onClick={() => { setFormData(p); setSizes(p.sizes || [{name: '', price: ''}]); setSizeCount(p.sizes?.length || 1); setView('edit'); }} className="p-2 text-slate-400 hover:text-blue-600"><Icons.Edit className="w-5 h-5" /></button>
-                                                        <button onClick={() => deleteProduct(p.id)} className="p-2 text-slate-400 hover:text-red-600"><Icons.Trash2 className="w-5 h-5" /></button>
+                                                        <button onClick={() => deleteProduct(p.id)} className="text-red-600 hover:bg-red-50 p-2 rounded">Delete</button>
                                                     </td>
                                                 </tr>
                                             ))}
@@ -606,104 +646,66 @@
                                     </table>
                                 </div>
                             )}
-                            {(view === 'add' || view === 'edit') && (
-                                <form onSubmit={handleSave} className="bg-white p-6 rounded-xl border border-slate-200 space-y-6">
-                                    <div className="space-y-4">
-                                        <h3 className="font-bold text-lg border-b pb-2">Basic Details</h3>
-                                        <input type="text" placeholder="Product Name" required className="w-full p-2 border rounded" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
-                                        <input type="text" placeholder="Category" required className="w-full p-2 border rounded" value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})} />
-                                        <textarea placeholder="Description" required className="w-full p-2 border rounded" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} />
+                            {view === 'add' && (
+                                <form onSubmit={handleSave} className="bg-white p-6 border rounded-xl space-y-4">
+                                    <input type="text" placeholder="Product Name" required className="w-full p-2 border rounded" onChange={e => setFormData({...formData, name: e.target.value})} />
+                                    <input type="text" placeholder="Category" required className="w-full p-2 border rounded" onChange={e => setFormData({...formData, category: e.target.value})} />
+                                    <textarea placeholder="Description" required className="w-full p-2 border rounded" onChange={e => setFormData({...formData, description: e.target.value})} />
+                                    <input type="file" multiple accept="image/*" className="w-full border p-2" onChange={handleImageUpload} />
+                                    <div className="flex gap-4 items-center">
+                                        <select value={sizeCount} onChange={handleSizeCountChange} className="border p-2 rounded bg-white">
+                                            {[...Array(5)].map((_, i) => <option key={i+1} value={i+1}>{i+1} Size Options</option>)}
+                                        </select>
                                     </div>
-                                    <div className="space-y-4">
-                                        <h3 className="font-bold text-lg border-b pb-2">Upload Photos</h3>
-                                        <input type="file" multiple accept="image/*" onChange={handleImageUpload} className="w-full border p-2 bg-slate-50 rounded" />
-                                        {formData.images && formData.images.length > 0 && (
-                                            <div className="flex flex-wrap gap-2 mt-2">
-                                                {formData.images.map((imgBase64, idx) => (
-                                                    <div key={idx} className="relative w-20 h-20 border rounded overflow-hidden">
-                                                        <img src={imgBase64} className="w-full h-full object-cover" />
-                                                        <button type="button" onClick={() => removeImage(idx)} className="absolute top-0 right-0 bg-red-600 text-white text-xs px-1 rounded-bl">X</button>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
-                                    <div className="space-y-4">
-                                        <h3 className="font-bold text-lg border-b pb-2">Size & Pricing</h3>
-                                        <div>
-                                            <select value={sizeCount} onChange={handleSizeCountChange} className="w-full sm:w-1/3 border p-2 rounded bg-white">
-                                                {[...Array(10)].map((_, i) => <option key={i+1} value={i+1}>{i+1} Sizes</option>)}
-                                            </select>
+                                    {sizes.map((size, idx) => (
+                                        <div key={idx} className="flex gap-4">
+                                            <input type="text" placeholder="Size (e.g., Small)" required className="w-1/2 p-2 border rounded" onChange={(e) => handleSizeInput(idx, 'name', e.target.value)} />
+                                            <input type="number" placeholder="Price (₹)" required className="w-1/2 p-2 border rounded" onChange={(e) => handleSizeInput(idx, 'price', e.target.value)} />
                                         </div>
-                                        <div className="space-y-3 mt-4">
-                                            {sizes.map((size, idx) => (
-                                                <div key={idx} className="flex gap-4 items-center bg-slate-50 p-3 rounded border">
-                                                    <span className="font-bold text-slate-500 w-6">{idx + 1}.</span>
-                                                    <div className="flex-1"><input type="text" placeholder="Size Name" required className="w-full p-2 border rounded" value={size.name} onChange={(e) => handleSizeInput(idx, 'name', e.target.value)} /></div>
-                                                    <div className="flex-1"><input type="number" step="0.01" placeholder="Price (₹)" required className="w-full p-2 border rounded" value={size.price} onChange={(e) => handleSizeInput(idx, 'price', e.target.value)} /></div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                    <button type="submit" className="w-full bg-slate-900 text-white p-3 rounded font-bold text-lg hover:bg-slate-800">Save Product</button>
+                                    ))}
+                                    <button type="submit" className="w-full bg-slate-900 text-white p-3 rounded font-bold">Save Product</button>
                                 </form>
                             )}
                         </div>
                     )}
-                    
+
                     {adminTab === 'orders' && (
                         <div className="space-y-4">
-                            {orders.length === 0 ? <p className="text-slate-500 bg-white p-6 border rounded-xl">No orders found.</p> : (
-                                orders.map(o => (
-                                    <div key={o.id} className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-                                        <div className="flex justify-between font-bold border-b pb-2 mb-2">
-                                            <span>Order: {o.id}</span>
-                                            <span className="text-blue-600">₹{(o.total || 0).toFixed(2)}</span>
-                                        </div>
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                            <div>
-                                                <p className="text-sm font-bold text-slate-700">Customer Details:</p>
-                                                <p className="text-sm text-slate-600">Name: {o.address?.name}<br/>Mobile: {o.address?.mobile}</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-sm font-bold text-slate-700">Delivery Address:</p>
-                                                <p className="text-sm text-slate-600 bg-slate-50 p-2 rounded border">
-                                                    {o.address?.village}, {o.address?.locality}<br/>{o.address?.stateDistrict} - {o.address?.pincode}<br/>{o.address?.country}
-                                                </p>
-                                            </div>
-                                        </div>
-                                        <div className="mt-4 p-3 bg-blue-50 border border-blue-100 rounded-lg">
-                                            <div className="space-y-3">
-                                                {o.items.map((item, idx) => {
-                                                    const itemImage = item.images && item.images.length > 0 ? item.images[0] : (item.imageUrl || 'https://via.placeholder.com/100?text=No+Image');
-                                                    return (
-                                                        <div key={idx} className="flex items-center justify-between bg-white p-3 rounded-lg border border-blue-100 shadow-sm">
-                                                            <div className="flex items-center gap-4">
-                                                                <img src={itemImage} alt={item.name} className="w-16 h-16 object-cover rounded-md border" />
-                                                                <div>
-                                                                    <p className="font-bold text-slate-800">{item.name}</p>
-                                                                    <p className="text-xs text-slate-500">Size: {item.selectedSize?.name || 'Standard'}</p>
-                                                                    <p className="text-sm font-black text-blue-700">Quantity: {item.quantity}</p>
-                                                                </div>
-                                                            </div>
-                                                            <span className="font-bold text-slate-800">₹{(parseFloat(item.selectedSize?.price || item.price) * item.quantity).toFixed(2)}</span>
-                                                        </div>
-                                                    )
-                                                })}
-                                            </div>
-                                        </div>
-                                        <div className="mt-4 flex flex-col sm:flex-row items-center justify-between border-t pt-4 gap-4">
-                                            <div className="text-sm font-bold px-3 py-1.5 rounded-full border bg-orange-50 text-orange-600">Status: {o.status}</div>
-                                            <div className="flex gap-2 w-full sm:w-auto">
-                                                {o.status === 'Pending' && <button onClick={() => updateOrderStatus(o.id, 'Confirmed')} className="bg-blue-600 text-white font-bold text-sm px-4 py-2 rounded-lg">Confirm Order</button>}
-                                                {o.status === 'Confirmed' && <button onClick={() => updateOrderStatus(o.id, 'Shipped')} className="bg-purple-600 text-white font-bold text-sm px-4 py-2 rounded-lg">Pack & Ship</button>}
-                                                {o.status === 'Shipped' && <button onClick={() => updateOrderStatus(o.id, 'Delivered')} className="bg-green-600 text-white font-bold text-sm px-4 py-2 rounded-lg">Mark Delivered</button>}
-                                                <button onClick={() => { if(window.confirm('Delete this order?')) deleteOrder(o.id); }} className="bg-red-100 text-red-600 font-bold text-sm px-4 py-2 rounded-lg">Delete</button>
-                                            </div>
+                            {orders.map(o => (
+                                <div key={o.id} className="bg-white p-5 border rounded-xl shadow-sm">
+                                    <div className="flex justify-between font-bold border-b pb-2 mb-2"><span>Order: {o.id}</span><span className="text-blue-600">₹{(o.total || 0).toFixed(2)}</span></div>
+                                    <p className="text-sm text-slate-600">Client: {o.address?.name} ({o.address?.mobile})</p>
+                                    <div className="mt-4 flex justify-between items-center">
+                                        <span className={`text-xs px-3 py-1 rounded-full font-bold ${o.status === 'Cancelled' ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'}`}>Status: {o.status}</span>
+                                        <div className="flex gap-2">
+                                            {o.status === 'Pending' && <button onClick={() => updateOrderStatus(o.id, 'Confirmed')} className="bg-blue-600 text-white text-xs px-3 py-1.5 rounded font-bold">Confirm</button>}
+                                            {o.status === 'Confirmed' && <button onClick={() => updateOrderStatus(o.id, 'Shipped')} className="bg-purple-600 text-white text-xs px-3 py-1.5 rounded font-bold">Ship Order</button>}
+                                            {o.status === 'Shipped' && <button onClick={() => updateOrderStatus(o.id, 'Delivered')} className="bg-green-600 text-white text-xs px-3 py-1.5 rounded font-bold">Mark Delivered</button>}
+                                            
+                                            {/* Cancel Action - triggers Soft Delete */}
+                                            {o.status !== 'Cancelled' && o.status !== 'Delivered' && o.status !== 'Shipped' && (
+                                                <button onClick={() => deleteOrder(o.id)} className="bg-red-100 text-red-600 text-xs px-3 py-1.5 rounded font-bold">Cancel Order</button>
+                                            )}
                                         </div>
                                     </div>
-                                ))
-                            )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {adminTab === 'customReqs' && (
+                        <div className="space-y-4">
+                            {customRequests.map(req => (
+                                <div key={req.id} className="bg-white p-5 border rounded-xl shadow-sm grid grid-cols-1 md:grid-cols-4 gap-4">
+                                    <div className="md:col-span-1"><img src={req.image} className="w-full h-32 object-cover border rounded-lg" /></div>
+                                    <div className="md:col-span-3 space-y-2">
+                                        <div className="flex justify-between items-start"><h3 className="font-bold text-lg text-slate-900">{req.modelName}</h3><span className="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded">{req.date}</span></div>
+                                        <p className="text-sm text-slate-600 bg-slate-50 p-2 border rounded">{req.instructions}</p>
+                                        <div className="text-xs text-slate-500"><p>Client: {req.userName} | Mobile: {req.userMobile}</p></div>
+                                        <div className="pt-2 flex justify-end"><button onClick={() => deleteCustomRequest(req.id)} className="bg-red-50 text-red-600 px-3 py-1.5 rounded text-xs font-bold">Remove</button></div>
+                                    </div>
+                                </div>
+                            ))}
                         </div>
                     )}
                 </div>
@@ -713,57 +715,43 @@
         function AuthPage({ setCurrentTab }) {
             const { setUser } = useStore();
             const [isLogin, setIsLogin] = useState(true);
-            const [formData, setFormData] = useState({ 
-                name: '', email: '', password: '', confirmPassword: '', mobile: '', 
-                village: '', locality: '', stateDistrict: '', pincode: '', country: '' 
-            });
+            const [formData, setFormData] = useState({ name: '', email: '', password: '', mobile: '', village: '', locality: '', stateDistrict: '', pincode: '', country: 'India' });
             const [error, setError] = useState('');
 
             const handleSubmit = async (e) => {
                 e.preventDefault();
                 setError('');
-                if (!isLogin && formData.password !== formData.confirmPassword) {
-                    setError('Passwords do not match!'); return;
-                }
-                if (isLogin) {
-                    try {
-                        const userCredential = await window.fbAuth.signInWithEmailAndPassword(window.auth, formData.email, formData.password);
-                        setUser({ email: userCredential.user.email, ...formData });
+                try {
+                    if (isLogin) {
+                        const credential = await window.fbAuth.signInWithEmailAndPassword(window.auth, formData.email, formData.password);
+                        setUser({ email: credential.user.email, name: formData.email.split('@')[0], mobile: '9999999999' });
                         setCurrentTab('home');
-                    } catch (error) { setError('Invalid credentials!'); }
-                } else {
-                    try {
-                        const userCredential = await window.fbAuth.createUserWithEmailAndPassword(window.auth, formData.email, formData.password);
-                        setUser({ email: userCredential.user.email, ...formData });
+                    } else {
+                        const credential = await window.fbAuth.createUserWithEmailAndPassword(window.auth, formData.email, formData.password);
+                        setUser({ email: credential.user.email, ...formData });
                         setCurrentTab('home');
-                    } catch (error) { setError(error.message); }
-                }
+                    }
+                } catch (err) { setError('Authentication Failed: Invalid Data.'); }
             };
 
             return (
-                <div className="max-w-md mx-auto mt-10 mb-24 bg-white p-8 rounded-xl border border-slate-200">
+                <div className="max-w-md mx-auto mt-10 mb-24 bg-white p-8 border rounded-xl">
                     <h2 className="text-2xl font-bold text-center mb-6">{isLogin ? 'Sign In' : 'Create Account'}</h2>
-                    {error && <div className="mb-4 p-3 bg-red-50 text-red-600 rounded-lg text-sm">{error}</div>}
+                    {error && <div className="mb-4 p-2 bg-red-50 text-red-600 rounded text-center text-sm">{error}</div>}
                     <form onSubmit={handleSubmit} className="space-y-4">
                         {!isLogin && (
                             <>
-                                <input type="text" placeholder="Full Name" required className="w-full p-2 border rounded" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
-                                <input type="tel" placeholder="Mobile" required className="w-full p-2 border rounded" value={formData.mobile} onChange={e => setFormData({...formData, mobile: e.target.value})} />
-                                <input type="text" placeholder="City / Village" required className="w-full p-2 border rounded" value={formData.village} onChange={e => setFormData({...formData, village: e.target.value})} />
-                                <input type="text" placeholder="Locality" required className="w-full p-2 border rounded" value={formData.locality} onChange={e => setFormData({...formData, locality: e.target.value})} />
-                                <input type="text" placeholder="State & District" required className="w-full p-2 border rounded" value={formData.stateDistrict} onChange={e => setFormData({...formData, stateDistrict: e.target.value})} />
-                                <input type="number" placeholder="Pincode" required className="w-full p-2 border rounded" value={formData.pincode} onChange={e => setFormData({...formData, pincode: e.target.value})} />
-                                <input type="text" placeholder="Country" required className="w-full p-2 border rounded" value={formData.country} onChange={e => setFormData({...formData, country: e.target.value})} />
+                                <input type="text" placeholder="Full Name" required className="w-full p-2 border rounded" onChange={e => setFormData({...formData, name: e.target.value})} />
+                                <input type="tel" placeholder="Mobile" required className="w-full p-2 border rounded" onChange={e => setFormData({...formData, mobile: e.target.value})} />
+                                <input type="text" placeholder="City / Village" required className="w-full p-2 border rounded" onChange={e => setFormData({...formData, village: e.target.value})} />
+                                <input type="number" placeholder="Pincode" required className="w-full p-2 border rounded" onChange={e => setFormData({...formData, pincode: e.target.value})} />
                             </>
                         )}
-                        <input type="email" placeholder="Email" required className="w-full p-2 border rounded" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
-                        <input type="password" placeholder="Password" required className="w-full p-2 border rounded" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} />
-                        {!isLogin && <input type="password" placeholder="Confirm Password" required className="w-full p-2 border rounded" value={formData.confirmPassword} onChange={e => setFormData({...formData, confirmPassword: e.target.value})} />}
-                        <button type="submit" className="w-full bg-blue-600 text-white py-2 rounded-md mt-4">{isLogin ? 'Sign In' : 'Sign Up'}</button>
+                        <input type="email" placeholder="Email" required className="w-full p-2 border rounded" onChange={e => setFormData({...formData, email: e.target.value})} />
+                        <input type="password" placeholder="Password" required className="w-full p-2 border rounded" onChange={e => setFormData({...formData, password: e.target.value})} />
+                        <button type="submit" className="w-full bg-blue-600 text-white py-2 rounded font-medium">{isLogin ? 'Sign In' : 'Sign Up'}</button>
                     </form>
-                    <div className="mt-6 text-center">
-                        <button onClick={() => setIsLogin(!isLogin)} className="text-blue-600 font-medium">{isLogin ? 'Need an account? Sign Up' : 'Already have an account? Sign In'}</button>
-                    </div>
+                    <div className="mt-4 text-center text-sm"><button onClick={() => setIsLogin(!isLogin)} className="text-blue-600">{isLogin ? 'Create Account' : 'Sign In instead'}</button></div>
                 </div>
             );
         }
@@ -785,7 +773,7 @@
 
             return (
                 <div className="min-h-screen">
-                    <header className="bg-white border-b border-slate-200 sticky top-0 z-40">
+                    <header className="bg-white border-b sticky top-0 z-40 shadow-sm">
                         <div className="max-w-7xl mx-auto px-4 h-14 flex justify-between items-center">
                             <button onClick={() => setCurrentTab('home')} className="text-xl font-bold text-slate-900 flex items-center gap-2">
                                 <Icons.PackagePlus className="w-6 h-6 text-blue-600" /> Customize shop
@@ -801,7 +789,7 @@
                         {currentTab === 'admin' && <AdminPage setCurrentTab={setCurrentTab} />}
                         {currentTab === 'auth' && <AuthPage setCurrentTab={setCurrentTab} />}
                     </main>
-                    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 pb-safe z-50">
+                    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t pb-safe z-50">
                         <div className="flex justify-around items-center h-16 max-w-md mx-auto">
                             {navItems.map(item => (
                                 <button key={item.id} onClick={() => { if ((item.id === 'profile' || item.id === 'custom') && !user) setCurrentTab('auth'); else setCurrentTab(item.id); }} className={`flex flex-col items-center justify-center w-full h-full ${currentTab === item.id ? 'text-blue-600' : 'text-slate-500'}`}>
