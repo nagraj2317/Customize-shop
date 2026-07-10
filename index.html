@@ -57,7 +57,7 @@
             
             const [products, setProducts] = useState([
                 {
-                    id: 'p1', name: '3D Printed Vase', category: 'Decor', price: 499, description: 'ખૂબ જ સુંદર 3D પ્રિન્ટેડ ફ્લાવર વાઝ.',
+                    id: 'p1', name: '3D Printed Vase', category: 'Decor', price: 499, description: 'A beautiful 3D printed flower vase.',
                     images: ['https://via.placeholder.com/400/333333/FFFFFF?text=Photo+1', 'https://via.placeholder.com/400/555555/FFFFFF?text=Photo+2'],
                     sizes: [{name: 'Small', price: 499}, {name: 'Large', price: 899}]
                 }
@@ -110,7 +110,7 @@
                     <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
                         {products.length === 0 ? (
                             <div className="col-span-full text-center py-20 bg-white rounded-xl border border-slate-200 text-slate-500">
-                                હાલમાં કોઈ પ્રોડક્ટ ઉપલબ્ધ નથી.
+                                No products available at the moment.
                             </div>
                         ) : (
                             products.map(product => <ProductCard key={product.id} product={product} addToCart={addToCart} setCurrentTab={setCurrentTab} setSelectedProduct={setSelectedProduct} />)
@@ -189,7 +189,7 @@
                     <div className="p-4 sm:p-6">
                         <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mb-2">{product.name}</h2>
                         <p className="text-sm sm:text-base font-bold text-green-600 mb-6 flex items-center gap-2 bg-green-50 p-2 rounded-lg w-max">
-                            🔥 ગયા મહિને {fakeSales} લોકોએ આ પ્રોડક્ટ ખરીદી
+                            🔥 {fakeSales} people bought this last month
                         </p>
 
                         <div className="flex overflow-x-auto gap-4 snap-x snap-mandatory pb-4 hide-scrollbar">
@@ -197,17 +197,17 @@
                                 <img key={idx} src={img} alt={`Slide ${idx}`} className="w-[85%] sm:w-[400px] h-[300px] sm:h-[400px] object-cover rounded-xl snap-center flex-shrink-0 border border-slate-200 shadow-sm" />
                             ))}
                         </div>
-                        <p className="text-xs text-slate-400 text-center mt-1 mb-6">(બાજુમાં સ્વાઇપ કરીને બધા ફોટા જુઓ)</p>
+                        <p className="text-xs text-slate-400 text-center mt-1 mb-6">(Swipe sideways to view all photos)</p>
 
                         <div className="mt-4">
-                            <h3 className="font-bold text-lg border-b pb-2 mb-3">પ્રોડક્ટની માહિતી</h3>
-                            <p className="text-slate-600 text-base leading-relaxed mb-6">{product.description || 'આ પ્રોડક્ટ માટે કોઈ વધારાની માહિતી ઉપલબ્ધ નથી.'}</p>
+                            <h3 className="font-bold text-lg border-b pb-2 mb-3">Product Information</h3>
+                            <p className="text-slate-600 text-base leading-relaxed mb-6">{product.description || 'No additional information available for this product.'}</p>
                         </div>
 
                         <div className="mt-6 p-5 bg-slate-50 rounded-xl border border-slate-200 shadow-inner">
                             {hasSizes && (
                                 <div className="mb-4">
-                                    <label className="block text-sm font-bold text-slate-700 mb-2">સાઇઝ પસંદ કરો:</label>
+                                    <label className="block text-sm font-bold text-slate-700 mb-2">Select Size:</label>
                                     <select className="w-full sm:w-1/2 border border-slate-300 rounded-lg p-3 bg-white outline-none font-medium" value={selectedSizeIndex} onChange={(e) => setSelectedSizeIndex(e.target.value)}>
                                         {product.sizes.map((s, i) => <option key={i} value={i}>{s.name} - ₹{s.price}</option>)}
                                     </select>
@@ -215,10 +215,10 @@
                             )}
                             <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-200">
                                 <div>
-                                    <p className="text-sm text-slate-500">કુલ કિંમત</p>
+                                    <p className="text-sm text-slate-500">Total Price</p>
                                     <span className="text-3xl font-black text-slate-900">₹{parseFloat(currentPrice).toFixed(2)}</span>
                                 </div>
-                                <button onClick={() => { addToCart(product, currentSize); alert('કાર્ટમાં ઉમેરાઈ ગયું!'); }} className="bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 font-bold flex items-center gap-2 shadow-lg">
+                                <button onClick={() => { addToCart(product, currentSize); alert('Successfully added to cart!'); }} className="bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 font-bold flex items-center gap-2 shadow-lg">
                                     <Icons.ShoppingCart className="w-5 h-5" /> Add to Cart
                                 </button>
                             </div>
@@ -355,7 +355,7 @@
                         <p className="mt-2 text-sm text-slate-500"><strong>Address:</strong><br/>{user.village}, {user.locality}<br/>{user.stateDistrict} - {user.pincode}<br/>{user.country}</p>
                     </div>
                     
-                    <h2 className="font-bold text-xl mb-4">Order History (ટ્રેકિંગ)</h2>
+                    <h2 className="font-bold text-xl mb-4">Order History</h2>
                     {myOrders.length === 0 ? <p className="text-slate-500">No orders found.</p> : (
                         <div className="space-y-4">
                             {myOrders.map(o => (
@@ -454,6 +454,14 @@
                 setView('add');
             };
 
+            const handleInviteAdmin = () => {
+                const newAdmin = prompt("Enter the email ID of the new admin:");
+                if(newAdmin) {
+                    setInvitedAdmins([...invitedAdmins, newAdmin]);
+                    alert(`${newAdmin} has been added as an admin!`);
+                }
+            };
+
             return (
                 <div className="max-w-5xl mx-auto px-4 py-6 pb-24">
                     <div className="flex items-center justify-between mb-8 pb-4 border-b border-slate-200">
@@ -461,6 +469,7 @@
                             <div className="w-12 h-12 bg-slate-900 text-white rounded-lg flex items-center justify-center"><Icons.LayoutDashboard className="w-6 h-6" /></div>
                             <div><h1 className="text-2xl font-bold text-slate-900">Admin Dashboard</h1></div>
                         </div>
+                        <button onClick={handleInviteAdmin} className="bg-blue-100 text-blue-700 px-4 py-2 rounded-lg font-bold">+ Invite Admin</button>
                     </div>
 
                     <div className="flex gap-4 mb-6">
@@ -486,7 +495,7 @@
                                             <tr><th className="px-6 py-4">Product</th><th className="px-6 py-4">Price</th><th className="px-6 py-4 text-right">Actions</th></tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-200">
-                                            {products.length === 0 && <tr><td colSpan="3" className="text-center py-6">કોઈ પ્રોડક્ટ નથી.</td></tr>}
+                                            {products.length === 0 && <tr><td colSpan="3" className="text-center py-6">No products found.</td></tr>}
                                             {products.map(p => (
                                                 <tr key={p.id} className="hover:bg-slate-50">
                                                     <td className="px-6 py-4 flex gap-4 items-center">
@@ -530,17 +539,17 @@
                                     <div className="space-y-4">
                                         <h3 className="font-bold text-lg border-b pb-2">Size & Pricing</h3>
                                         <div>
-                                            <label className="text-sm font-bold text-slate-700 block mb-1">આ પ્રોડક્ટમાં કેટલી સાઇઝના ઓપ્શન આપવા છે?</label>
+                                            <label className="text-sm font-bold text-slate-700 block mb-1">How many size options do you want to provide?</label>
                                             <select value={sizeCount} onChange={handleSizeCountChange} className="w-full sm:w-1/3 border p-2 rounded bg-white">
-                                                {[...Array(10)].map((_, i) => <option key={i+1} value={i+1}>{i+1} સાઇઝ</option>)}
+                                                {[...Array(10)].map((_, i) => <option key={i+1} value={i+1}>{i+1} Sizes</option>)}
                                             </select>
                                         </div>
                                         <div className="space-y-3 mt-4">
                                             {sizes.map((size, idx) => (
                                                 <div key={idx} className="flex gap-4 items-center bg-slate-50 p-3 rounded border">
                                                     <span className="font-bold text-slate-500 w-6">{idx + 1}.</span>
-                                                    <div className="flex-1"><input type="text" placeholder="સાઇઝનું નામ (દા.ત. Size 1)" required className="w-full p-2 border rounded" value={size.name} onChange={(e) => handleSizeInput(idx, 'name', e.target.value)} /></div>
-                                                    <div className="flex-1"><input type="number" step="0.01" placeholder="કિંમત (₹)" required className="w-full p-2 border rounded" value={size.price} onChange={(e) => handleSizeInput(idx, 'price', e.target.value)} /></div>
+                                                    <div className="flex-1"><input type="text" placeholder="Size Name (e.g., Size 1)" required className="w-full p-2 border rounded" value={size.name} onChange={(e) => handleSizeInput(idx, 'name', e.target.value)} /></div>
+                                                    <div className="flex-1"><input type="number" step="0.01" placeholder="Price (₹)" required className="w-full p-2 border rounded" value={size.price} onChange={(e) => handleSizeInput(idx, 'price', e.target.value)} /></div>
                                                 </div>
                                             ))}
                                         </div>
@@ -554,7 +563,7 @@
                     {/* Orders Tab */}
                     {adminTab === 'orders' && (
                         <div className="space-y-4">
-                            {orders.length === 0 ? <p className="text-slate-500 bg-white p-6 border rounded-xl">હજુ કોઈ ઓર્ડર મળ્યા નથી.</p> : (
+                            {orders.length === 0 ? <p className="text-slate-500 bg-white p-6 border rounded-xl">No orders have been placed yet.</p> : (
                                 orders.map(o => (
                                     <div key={o.id} className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
                                         <div className="flex justify-between font-bold border-b pb-2 mb-2">
@@ -577,21 +586,20 @@
                                             </div>
                                         </div>
 
-                                        {/* નવો સુધારો: ઓર્ડરમાં ફોટો, નામ અને ક્વોન્ટિટી સ્પષ્ટ બતાવે છે */}
                                         <div className="mt-4 p-3 bg-blue-50 border border-blue-100 rounded-lg">
-                                            <p className="font-bold text-blue-900 border-b border-blue-200 pb-2 mb-3">Items to Pack (ફોટો અને ક્વોન્ટિટી):</p>
+                                            <p className="font-bold text-blue-900 border-b border-blue-200 pb-2 mb-3">Items to Pack (Photo & Quantity):</p>
                                             <div className="space-y-3">
                                                 {o.items.map((item, idx) => {
                                                     const itemImage = item.images && item.images.length > 0 ? item.images[0] : (item.imageUrl || 'https://via.placeholder.com/100');
                                                     return (
-                                                        <div key={idx} className="flex items-center justify-between bg-white p-2 rounded-lg border border-blue-100 shadow-sm">
+                                                        <div key={idx} className="flex items-center justify-between bg-white p-3 rounded-lg border border-blue-100 shadow-sm">
                                                             <div className="flex items-center gap-4">
-                                                                {/* અહીં પ્રોડક્ટનો ફોટો દેખાશે */}
-                                                                <img src={itemImage} alt={item.name} className="w-14 h-14 object-cover rounded border border-slate-200" />
+                                                                {/* Image Display inside Admin Order Details */}
+                                                                <img src={itemImage} alt={item.name} onError={(e) => { e.target.onerror = null; e.target.src="https://via.placeholder.com/100?text=No+Image" }} className="w-16 h-16 object-cover rounded-md border border-slate-200 flex-shrink-0" />
                                                                 <div>
                                                                     <p className="font-bold text-slate-800 leading-tight">{item.name}</p>
-                                                                    <p className="text-xs text-slate-500 mb-1">સાઇઝ: {item.selectedSize?.name || 'Standard'}</p>
-                                                                    <p className="text-sm font-black text-blue-700">Quantity: {item.quantity}</p>
+                                                                    <p className="text-xs text-slate-500 mb-1">Size: {item.selectedSize?.name || 'Standard'}</p>
+                                                                    <p className="text-sm font-black text-blue-700 bg-blue-100 px-2 py-1 rounded inline-block">Quantity: {item.quantity}</p>
                                                                 </div>
                                                             </div>
                                                             <span className="font-bold text-slate-800 pr-2">₹{(parseFloat(item.selectedSize?.price || item.price) * item.quantity).toFixed(2)}</span>
@@ -635,141 +643,7 @@
                 e.preventDefault();
                 setError('');
                 if (!isLogin && formData.password !== formData.confirmPassword) {
-                    setError('પાસવર્ડ અને કન્ફર્મ પાસવર્ડ મેચ થતા નથી!'); return;
+                    setError('Passwords do not match!'); return;
                 }
                 if (!window.fbAuth || !window.auth) {
-                    alert("સિસ્ટમ લોડ થઈ રહી છે, કૃપા કરીને એક સેકન્ડ પછી ફરી પ્રયાસ કરો."); return;
-                }
-                if (isLogin) {
-                    try {
-                        const userCredential = await window.fbAuth.signInWithEmailAndPassword(window.auth, formData.email, formData.password);
-                        setUser({ email: userCredential.user.email, ...formData });
-                        setCurrentTab('home');
-                    } catch (error) { setError('ખોટો ઇમેઇલ અથવા પાસવર્ડ! કૃપા કરીને ફરી પ્રયાસ કરો.'); }
-                } else {
-                    try {
-                        const userCredential = await window.fbAuth.createUserWithEmailAndPassword(window.auth, formData.email, formData.password);
-                        setUser({ email: userCredential.user.email, ...formData });
-                        setCurrentTab('home');
-                    } catch (error) {
-                        if (error.code === 'auth/email-already-in-use') setError('આ ઇમેઇલ આઇડી પહેલેથી રજીસ્ટર થયેલું છે.');
-                        else setError('ભૂલ: ' + error.message);
-                    }
-                }
-            };
-
-            return (
-                <div className="max-w-md mx-auto mt-10 mb-24 bg-white p-8 rounded-xl shadow-sm border border-slate-200">
-                    <h2 className="text-2xl font-bold text-center text-slate-900 mb-6">{isLogin ? 'Sign In to Customize shop' : 'Create an Account'}</h2>
-                    {error && <div className="mb-4 p-3 bg-red-50 text-red-600 rounded-lg text-sm">{error}</div>}
-                    <form onSubmit={handleSubmit} className="space-y-4">
-                        {!isLogin && (
-                            <>
-                                <input type="text" placeholder="Full Name" required className="w-full p-2 border rounded" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
-                                <input type="tel" placeholder="Mobile" required className="w-full p-2 border rounded" value={formData.mobile} onChange={e => setFormData({...formData, mobile: e.target.value})} />
-                                
-                                <div className="text-sm font-bold text-slate-700 mt-4 border-b pb-1">એડ્રેસની માહિતી (5 વિભાગ)</div>
-                                <input type="text" placeholder="1. ગામ (Village)" required className="w-full p-2 border rounded" value={formData.village} onChange={e => setFormData({...formData, village: e.target.value})} />
-                                <input type="text" placeholder="2. વિસ્તાર (Locality)" required className="w-full p-2 border rounded" value={formData.locality} onChange={e => setFormData({...formData, locality: e.target.value})} />
-                                <input type="text" placeholder="3. જિલ્લો અને રાજ્ય (District & State)" required className="w-full p-2 border rounded" value={formData.stateDistrict} onChange={e => setFormData({...formData, stateDistrict: e.target.value})} />
-                                <input type="number" placeholder="4. પિનકોડ (Pincode)" required className="w-full p-2 border rounded" value={formData.pincode} onChange={e => setFormData({...formData, pincode: e.target.value})} />
-                                <input type="text" placeholder="5. દેશ (Country)" required className="w-full p-2 border rounded" value={formData.country} onChange={e => setFormData({...formData, country: e.target.value})} />
-                            </>
-                        )}
-                        <div className="text-sm font-bold text-slate-700 mt-4 border-b pb-1">લોગિન માહિતી</div>
-                        <input type="email" placeholder="Email" required className="w-full p-2 border rounded" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
-                        <input type="password" placeholder="Password" required className="w-full p-2 border rounded" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} />
-                        {!isLogin && <input type="password" placeholder="Confirm Password" required className="w-full p-2 border rounded" value={formData.confirmPassword} onChange={e => setFormData({...formData, confirmPassword: e.target.value})} />}
-                        <button type="submit" className="w-full bg-blue-600 text-white font-medium py-2 rounded-md mt-4">{isLogin ? 'Sign In' : 'Sign Up'}</button>
-                    </form>
-                    <div className="mt-6 text-center text-sm text-slate-600">
-                        <button onClick={() => {setIsLogin(!isLogin); setError('')}} className="text-blue-600 font-medium">{isLogin ? 'Need an account? Sign Up' : 'Already have an account? Sign In'}</button>
-                    </div>
-                </div>
-            );
-        }
-
-        function App() {
-            const { user, cart, invitedAdmins } = useStore();
-            const [currentTab, setCurrentTab] = useState('home');
-            const [selectedProduct, setSelectedProduct] = useState(null); 
-            
-            const cartItemsCount = cart.reduce((acc, item) => acc + item.quantity, 0);
-            const isAdmin = user && invitedAdmins.includes(user.email);
-
-            const navItems = [
-                { id: 'home', label: 'Products', icon: Icons.Home },
-                { id: 'custom', label: 'Custom', icon: Icons.PenTool },
-                { id: 'cart', label: 'Cart', icon: Icons.ShoppingCart, badge: cartItemsCount },
-                { id: 'profile', label: 'Profile', icon: Icons.User },
-                ...(isAdmin ? [{ id: 'admin', label: 'Admin', icon: Icons.LayoutDashboard }] : [])
-            ];
-
-            return (
-                <div className="min-h-screen">
-                    <header className="bg-white border-b border-slate-200 shadow-sm sticky top-0 z-40">
-                        <div className="max-w-7xl mx-auto px-4 h-14 flex justify-between items-center">
-                            <button onClick={() => setCurrentTab('home')} className="text-xl font-bold text-slate-900 flex items-center gap-2">
-                                <Icons.PackagePlus className="w-6 h-6 text-blue-600" /> Customize shop
-                            </button>
-                        </div>
-                    </header>
-                    
-                    <main>
-                        {currentTab === 'home' && <HomePage setCurrentTab={setCurrentTab} setSelectedProduct={setSelectedProduct} />}
-                        {currentTab === 'details' && <ProductDetailsPage product={selectedProduct} setCurrentTab={setCurrentTab} />}
-                        {currentTab === 'cart' && <CartPage setCurrentTab={setCurrentTab} />}
-                        {currentTab === 'custom' && <CustomRequestPage setCurrentTab={setCurrentTab} />}
-                        {currentTab === 'profile' && <ProfilePage setCurrentTab={setCurrentTab} />}
-                        {currentTab === 'admin' && <AdminPage setCurrentTab={setCurrentTab} />}
-                        {currentTab === 'auth' && <AuthPage setCurrentTab={setCurrentTab} />}
-                    </main>
-
-                    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 pb-safe z-50">
-                        <div className="flex justify-around items-center h-16 max-w-md mx-auto">
-                            {navItems.map(item => (
-                                <button key={item.id} onClick={() => { if ((item.id === 'profile' || item.id === 'custom') && !user) setCurrentTab('auth'); else setCurrentTab(item.id); }} className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${currentTab === item.id || (item.id === 'home' && currentTab === 'details') ? 'text-blue-600' : 'text-slate-500'}`}>
-                                    <div className="relative">
-                                        <item.icon className="w-6 h-6" />
-                                        {item.badge > 0 && <span className="absolute -top-1 -right-2 bg-blue-600 text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center font-bold">{item.badge}</span>}
-                                    </div>
-                                    <span className="text-[10px] font-medium">{item.label}</span>
-                                </button>
-                            ))}
-                        </div>
-                    </nav>
-                </div>
-            );
-        }
-
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<AppProvider><App /></AppProvider>);
-    </script>
-
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-        import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-
-        const firebaseConfig = {
-            apiKey: "AIzaSyBuATW-JUjY9ndWSbc4ojq8vWpC1n0ej98",
-            authDomain: "apex3d-e63c2.firebaseapp.com",
-            projectId: "apex3d-e63c2",
-            storageBucket: "apex3d-e63c2.firebasestorage.app",
-            messagingSenderId: "72705618242",
-            appId: "1:72705618242:web:7d8e2343e8effc847d18db",
-            measurementId: "G-YB6DG4PTPN"
-        };
-
-        const app = initializeApp(firebaseConfig);
-        window.db = getFirestore(app);
-        window.auth = getAuth(app);
-        
-        window.fb = { collection, doc, setDoc, deleteDoc, onSnapshot };
-        window.fbAuth = { signInWithEmailAndPassword, createUserWithEmailAndPassword };
-        
-        console.log("Firebase Super-Charged & Ready!");
-    </script>
-    
-</body>
-</html>
+                    alert("System is loading, please
