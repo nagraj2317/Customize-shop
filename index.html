@@ -584,15 +584,16 @@
   import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
   import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-  const firebaseConfig = {
-    apiKey: "AIzaSyBuATN-JUjY9ndWSbc4ojq8VWpCln0ej98",
-    authDomain: "apex3d-e63c2.firebaseapp.com",
-    projectId: "apex3d-e63c2",
-    storageBucket: "apex3d-e63c2.firebasestorage.app",
-    messagingSenderId: "72705610242",
-    appId: "1:72705610242:web:7d8e2341e8effc847d10db",
-    measurementId: "G-Y86DG4PTPN"
-  };
+const firebaseConfig = {
+  apiKey: "AIzaSyBuATW-JUjY9ndWSbc4ojq8vWpC1n0ej98",
+  authDomain: "apex3d-e63c2.firebaseapp.com",
+  projectId: "apex3d-e63c2",
+  storageBucket: "apex3d-e63c2.firebasestorage.app",
+  messagingSenderId: "72705618242",
+  appId: "1:72705618242:web:7d8e2343e8effc847d10db",
+  measurementId: "G-YB6DG4PTPN"
+};
+
 
   const app = initializeApp(firebaseConfig);
   window.db = getFirestore(app);
