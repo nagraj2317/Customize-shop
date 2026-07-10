@@ -40,7 +40,7 @@
         window.fb = { collection, doc, setDoc, deleteDoc, onSnapshot, getDoc };
         window.fbAuth = { signInWithEmailAndPassword, createUserWithEmailAndPassword, updatePassword };
         
-        console.log("Firebase system ready.");
+        console.log("Firebase system initialized successfully.");
     </script>
 </head>
 <body>
@@ -135,10 +135,7 @@
                 }
 
                 return () => {
-                    unsubProducts();
-                    unsubOrders();
-                    unsubRequests();
-                    unsubUser();
+                    unsubProducts(); unsubOrders(); unsubRequests(); unsubUser();
                 };
             }, [isFirebaseReady, user?.email]);
 
@@ -150,7 +147,6 @@
                 if (!isFirebaseReady) return;
                 await window.fb.deleteDoc(window.fb.doc(window.db, "products", id));
             };
-
             const addOrder = async (order) => {
                 if (!isFirebaseReady) return;
                 await window.fb.setDoc(window.fb.doc(window.db, "orders", order.id), order);
@@ -163,34 +159,25 @@
                     await window.fb.setDoc(window.fb.doc(window.db, "orders", orderId), updated);
                 }
             };
-
             const cancelOrderPermanently = async (orderId) => {
                 if (!isFirebaseReady) return;
                 const order = orders.find(o => o.id === orderId);
                 if (!order) return;
                 if (order.status === 'Shipped' || order.status === 'Delivered') {
-                    alert("Order is Shipped/Delivered and cannot be altered.");
-                    return;
+                    alert("Order is Shipped/Delivered and cannot be modified."); return;
                 }
                 const updated = { ...order, status: 'Cancelled' };
                 await window.fb.setDoc(window.fb.doc(window.db, "orders", orderId), updated);
             };
-
             const saveUserProfileInDatabase = async (updatedData, newPassword = "") => {
                 if (!isFirebaseReady) return;
                 const cleanEmail = updatedData.email.replace(/[.#$/\[\]]/g, "_");
                 await window.fb.setDoc(window.fb.doc(window.db, "users", cleanEmail), updatedData, { merge: true });
-                
                 if (newPassword && window.auth.currentUser) {
-                    try {
-                        await window.fbAuth.updatePassword(window.auth.currentUser, newPassword);
-                    } catch (err) {
-                        console.error(err);
-                    }
+                    try { await window.fbAuth.updatePassword(window.auth.currentUser, newPassword); } catch (err) { console.error(err); }
                 }
                 setUser(updatedData);
             };
-
             const addCustomRequest = async (req) => {
                 if (!isFirebaseReady) return;
                 await window.fb.setDoc(window.fb.doc(window.db, "customRequests", req.id), req);
@@ -227,11 +214,9 @@
 
             return (
                 <AppContext.Provider value={{ 
-                    user, setUser, invitedAdmins, setInvitedAdmins,
-                    products, addOrUpdateProduct, deleteProduct, 
+                    user, setUser, invitedAdmins, setInvitedAdmins, products, addOrUpdateProduct, deleteProduct, 
                     cart, addToCart, removeFromCart, updateQuantity, clearCart, updateCartItemFile,
-                    orders, addOrder, updateOrderStatus, cancelOrderPermanently,
-                    customRequests, addCustomRequest, deleteCustomRequest, saveUserProfileInDatabase
+                    orders, addOrder, updateOrderStatus, cancelOrderPermanently, customRequests, addCustomRequest, deleteCustomRequest, saveUserProfileInDatabase
                 }}>
                     {children}
                 </AppContext.Provider>
@@ -247,14 +232,12 @@
             return (
                 <div className="max-w-7xl mx-auto px-4 py-6 pb-24">
                     <div className="mb-8">
-                        <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Customize shop</h1>
+                        <h1 className="text-3xl font-bold text-slate-900">Customize shop</h1>
                         <p className="text-slate-500 mt-1">Discover unique 3D creations</p>
                     </div>
                     <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
                         {products.length === 0 ? (
-                            <div className="col-span-full text-center py-20 bg-white rounded-xl border text-slate-500">
-                                No products available at the moment.
-                            </div>
+                            <div className="col-span-full text-center py-20 bg-white rounded-xl border text-slate-500">No products available.</div>
                         ) : (
                             products.map(product => <ProductCard key={product.id} product={product} addToCart={addToCart} setCurrentTab={setCurrentTab} setSelectedProduct={setSelectedProduct} />)
                         )}
@@ -301,7 +284,6 @@
         function ProductDetailsPage({ product, setCurrentTab }) {
             const { addToCart } = useStore();
             const [selectedSizeIndex, setSelectedSizeIndex] = useState(0);
-
             if (!product) return null;
             const hasSizes = product.sizes && product.sizes.length > 0;
             const currentSize = hasSizes ? product.sizes[selectedSizeIndex] : { name: 'Standard', price: product.price || 0 };
@@ -309,9 +291,7 @@
             return (
                 <div className="max-w-4xl mx-auto bg-white min-h-screen pb-24 border-x shadow-sm">
                     <div className="p-4 border-b flex items-center gap-3 sticky top-0 bg-white z-10 shadow-sm">
-                        <button onClick={() => setCurrentTab('home')} className="text-slate-600 p-2 bg-slate-100 rounded-full hover:bg-slate-200">
-                            <Icons.ArrowLeft className="w-5 h-5" />
-                        </button>
+                        <button onClick={() => setCurrentTab('home')} className="text-slate-600 p-2 bg-slate-100 rounded-full"><Icons.ArrowLeft className="w-5 h-5" /></button>
                         <h1 className="text-lg font-bold line-clamp-1">{product.name}</h1>
                     </div>
                     <div className="p-4 sm:p-6">
@@ -363,39 +343,25 @@
                 e.preventDefault();
                 if (!user) { setCurrentTab('auth'); return; }
                 setSubmitting(true);
-
                 const requestPayload = {
-                    id: 'REQ-' + Date.now(),
-                    userId: user.email,
-                    userName: user.name || 'Anonymous',
-                    userMobile: user.mobile || 'N/A',
-                    modelName,
-                    instructions,
-                    image,
-                    date: new Date().toLocaleDateString(),
-                    status: 'Pending'
+                    id: 'REQ-' + Date.now(), userId: user.email, userName: user.name || 'Anonymous', userMobile: user.mobile || 'N/A',
+                    modelName, instructions, image, date: new Date().toLocaleDateString(), status: 'Pending'
                 };
-
                 addCustomRequest(requestPayload).then(() => {
-                    alert('Custom request submitted successfully!');
-                    setModelName(''); setInstructions(''); setImage('');
-                    setSubmitting(false);
-                    setCurrentTab('profile');
+                    alert('Request submitted!'); setModelName(''); setInstructions(''); setImage(''); setSubmitting(false); setCurrentTab('profile');
                 });
             };
 
             return (
                 <div className="max-w-2xl mx-auto px-4 py-6 pb-24">
                     <div className="bg-white p-6 rounded-xl border shadow-sm">
-                        <h1 className="text-3xl font-bold text-slate-900 mb-6 text-center">Custom 3D Print Request</h1>
+                        <h1 className="text-3xl font-bold text-slate-900 mb-6 text-center">Custom 3D Request</h1>
                         <form onSubmit={handleSubmit} className="space-y-4">
-                            <input type="text" placeholder="Model TitleIdea" required className="w-full p-2 border rounded" value={modelName} onChange={e => setModelName(e.target.value)} />
-                            <textarea rows="4" placeholder="Detailed Specifications..." required className="w-full p-2 border rounded" value={instructions} onChange={e => setInstructions(e.target.value)} />
+                            <input type="text" placeholder="Title" required className="w-full p-2 border rounded" value={modelName} onChange={e => setModelName(e.target.value)} />
+                            <textarea rows="4" placeholder="Specifications..." required className="w-full p-2 border rounded" value={instructions} onChange={e => setInstructions(e.target.value)} />
                             <input type="file" accept="image/*" required className="w-full p-2 border bg-slate-50 rounded" onChange={handleImageUpload} />
                             {image && <img src={image} className="w-32 h-32 object-cover border rounded-lg" />}
-                            <button type="submit" disabled={submitting} className="w-full py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700">
-                                {submitting ? 'Submitting...' : 'Submit Request'}
-                            </button>
+                            <button type="submit" disabled={submitting} className="w-full py-3 bg-blue-600 text-white font-bold rounded-lg">{submitting ? 'Submitting...' : 'Submit Request'}</button>
                         </form>
                     </div>
                 </div>
@@ -407,14 +373,11 @@
             const [isCheckingOut, setIsCheckingOut] = useState(false);
             const [success, setSuccess] = useState(false);
             
-            // Crash Proof Total Loop Gainer
             let total = 0;
             if (cart && Array.isArray(cart) && cart.length > 0) {
                 cart.forEach(item => {
                     const rawPrice = item.selectedSize?.price || item.price || 0;
-                    const parsedPrice = parseFloat(rawPrice) || 0;
-                    const parsedQty = parseInt(item.quantity, 10) || 1;
-                    total += (parsedPrice * parsedQty);
+                    total += (parseFloat(rawPrice) * (parseInt(item.quantity, 10) || 1));
                 });
             }
 
@@ -422,9 +385,7 @@
                 const file = e.target.files[0];
                 if (file) {
                     const reader = new FileReader();
-                    reader.onloadend = () => {
-                        updateCartItemFile(index, reader.result);
-                    };
+                    reader.onloadend = () => updateCartItemFile(index, reader.result);
                     reader.readAsDataURL(file);
                 }
             };
@@ -432,51 +393,27 @@
             const handleCheckout = () => {
                 if (!user) { setCurrentTab('auth'); return; }
                 if (!cart || cart.length === 0) return;
-
-                const missingRequiredFiles = cart.some(item => item.fileToCustomer === true && !item.referenceFile);
-                if (missingRequiredFiles) {
-                    alert("ભૂલ: આ પ્રોડક્ટ માટે તમારો ફોટો/ડિઝાઇન ફાઇલ અપલોડ કરવી ફરજિયાત છે! કૃપા કરીને ફાઇલ સિલેક્ટ કરો.");
-                    return;
+                const missingFiles = cart.some(item => item.fileToCustomer === true && !item.referenceFile);
+                if (missingFiles) {
+                    alert("ભૂલ: આ પ્રોડક્ટ માટે તમારો ફોટો/ડિઝાઇન ફાઇલ અપલોડ કરવી ફરજિયાત છે!"); return;
                 }
-
                 setIsCheckingOut(true);
                 const newOrder = { 
-                    id: 'ORD-' + Date.now(), 
-                    userId: user.email, 
-                    address: {
-                        name: user.name || 'N/A',
-                        mobile: user.mobile || 'N/A',
-                        village: user.village || 'N/A',
-                        locality: user.locality || 'N/A',
-                        pincode: user.pincode || 'N/A',
-                        country: user.country || 'India'
-                    }, 
-                    items: [...cart], 
-                    total, 
-                    date: new Date().toLocaleDateString(),
-                    status: 'Pending'
+                    id: 'ORD-' + Date.now(), userId: user.email, 
+                    address: { name: user.name || 'N/A', mobile: user.mobile || 'N/A', village: user.village || 'N/A', locality: user.locality || 'N/A', pincode: user.pincode || 'N/A', country: 'India' }, 
+                    items: [...cart], total, date: new Date().toLocaleDateString(), status: 'Pending'
                 };
-
                 addOrder(newOrder).then(() => {
-                    clearCart();
-                    setSuccess(true);
-                    setTimeout(() => {
-                        setIsCheckingOut(false);
-                        setCurrentTab('profile');
-                    }, 2000);
+                    clearCart(); setSuccess(true);
+                    setTimeout(() => { setIsCheckingOut(false); setCurrentTab('profile'); }, 2000);
                 });
             };
 
-            if (success) return (
-                <div className="max-w-md mx-auto mt-20 p-8 bg-white rounded-xl text-center border">
-                    <h2 className="text-2xl font-bold text-slate-900 mb-2">Order Confirmed!</h2>
-                    <p className="text-slate-600">Your order details are recorded securely inside your box profile.</p>
-                </div>
-            );
+            if (success) return <div className="p-8 text-center font-bold text-green-600">Order Confirmed Successfully!</div>;
 
             return (
                 <div className="max-w-4xl mx-auto px-4 py-6 pb-24">
-                    <h1 className="text-3xl font-bold text-slate-900 mb-8 tracking-tight">Your Shopping Cart</h1>
+                    <h1 className="text-3xl font-bold text-slate-900 mb-8">Shopping Cart</h1>
                     {!cart || cart.length === 0 ? (
                         <div className="text-center py-20 bg-white rounded-xl border"><p>Your cart is empty.</p></div>
                     ) : (
@@ -485,38 +422,25 @@
                                 {cart.map((item, index) => {
                                     const displayPrice = item.selectedSize?.price || item.price || 0;
                                     return (
-                                        <div key={index} className="flex flex-col bg-white p-4 rounded-xl border shadow-sm space-y-4">
+                                        <div key={index} className="bg-white p-4 rounded-xl border shadow-sm space-y-4">
                                             <div className="flex flex-col sm:flex-row items-center gap-4">
                                                 <img src={item.images?.[0] || 'https://via.placeholder.com/100'} className="w-24 h-24 rounded-lg object-cover border" />
                                                 <div className="flex-1 text-center sm:text-left">
-                                                    <h3 className="font-semibold text-lg text-slate-900">{item.name || 'Product'}</h3>
-                                                    <p className="text-xs text-slate-400">Size: {item.selectedSize?.name || 'Standard'}</p>
+                                                    <h3 className="font-semibold text-slate-900">{item.name || 'Product'}</h3>
                                                     <p className="font-bold text-blue-600">₹{parseFloat(displayPrice).toFixed(2)}</p>
                                                 </div>
                                                 <div className="flex items-center gap-4">
-                                                    <div className="flex items-center gap-2 bg-slate-50 border rounded-lg p-1">
-                                                        <button onClick={() => updateQuantity(index, Math.max(1, item.quantity - 1))} className="p-1"><Icons.Minus className="w-4 h-4" /></button>
-                                                        <span className="w-8 text-center font-medium">{item.quantity}</span>
-                                                        <button onClick={() => updateQuantity(index, item.quantity + 1)} className="p-1"><Icons.Plus className="w-4 h-4" /></button>
-                                                    </div>
-                                                    <button onClick={() => removeFromCart(index)} className="p-2 text-red-500 rounded-lg"><Icons.Trash2 className="w-5 h-5" /></button>
+                                                    <button className="px-2 bg-slate-100 rounded" onClick={() => updateQuantity(index, Math.max(1, item.quantity - 1))}>-</button>
+                                                    <span className="w-8 text-center">{item.quantity}</span>
+                                                    <button className="px-2 bg-slate-100 rounded" onClick={() => updateQuantity(index, item.quantity + 1)}>+</button>
+                                                    <button onClick={() => removeFromCart(index)} className="text-red-500 ml-4"><Icons.Trash2 className="w-5 h-5 inline" /></button>
                                                 </div>
                                             </div>
-                                            
                                             {item.fileToCustomer === true && (
-                                                <div className="bg-blue-50/50 p-3 rounded-lg border border-blue-100 space-y-2">
-                                                    <label className="block text-xs font-bold text-blue-900 uppercase tracking-wider">
-                                                        ⚠️ Upload Your Custom Photo/3D File (REQUIRED)
-                                                    </label>
-                                                    <input type="file" accept="image/*" className="w-full text-xs text-slate-600 bg-white border p-1.5 rounded" onChange={(e) => handleFileChange(index, e)} />
-                                                    {item.referenceFile ? (
-                                                        <div className="flex items-center gap-2 text-xs text-green-700 font-bold bg-green-50 p-1.5 rounded">
-                                                            <span>✓ Photo Attached</span>
-                                                            <img src={item.referenceFile} className="w-10 h-10 object-cover border rounded shadow-xs ml-auto" />
-                                                        </div>
-                                                    ) : (
-                                                        <span className="block text-xs text-red-600 font-semibold animate-pulse">✖ Photo missing! Please upload a file to confirm order.</span>
-                                                    )}
+                                                <div className="bg-blue-50/50 p-3 rounded-lg border text-xs">
+                                                    <label className="block font-bold mb-1 text-blue-900">Upload Photo (REQUIRED):</label>
+                                                    <input type="file" accept="image/*" onChange={(e) => handleFileChange(index, e)} />
+                                                    {item.referenceFile && <img src={item.referenceFile} className="w-10 h-10 object-cover mt-1 rounded border" />}
                                                 </div>
                                             )}
                                         </div>
@@ -524,14 +448,9 @@
                                 })}
                             </div>
                             <div className="lg:col-span-1">
-                                <div className="bg-white p-6 rounded-xl border shadow-sm sticky top-20">
-                                    <h2 className="text-xl font-bold mb-6">Order Summary</h2>
-                                    <div className="flex justify-between font-bold text-lg border-t pt-4 mb-4">
-                                        <span>Total</span><span>₹{total.toFixed(2)}</span>
-                                    </div>
-                                    <button onClick={handleCheckout} disabled={isCheckingOut} className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow transition">
-                                        Confirm & Checkout Order
-                                    </button>
+                                <div className="bg-white p-6 rounded-xl border shadow-sm">
+                                    <div className="flex justify-between font-bold text-lg mb-4"><span>Total</span><span>₹{total.toFixed(2)}</span></div>
+                                    <button onClick={handleCheckout} disabled={isCheckingOut} className="w-full py-3 bg-blue-600 text-white font-bold rounded-lg">Checkout Order</button>
                                 </div>
                             </div>
                         </div>
@@ -547,123 +466,65 @@
 
             useEffect(() => {
                 if (user) {
-                    setProfileForm({
-                        name: user.name || '',
-                        mobile: user.mobile || '',
-                        village: user.village || '',
-                        locality: user.locality || '',
-                        pincode: user.pincode || '',
-                        password: user.password || ''
-                    });
+                    setProfileForm({ name: user.name || '', mobile: user.mobile || '', village: user.village || '', locality: user.locality || '', pincode: user.pincode || '', password: user.password || '' });
                 }
             }, [user, isEditing]);
 
             if (!user) return null;
             const myOrders = orders.filter(o => o.userId === user.email);
 
-            const triggerPasswordVerification = () => {
-                const checkPass = prompt("Security Check: Enter your current password to unlock editing:");
-                if (checkPass === null) return;
-                if (checkPass === user.password) {
-                    setIsEditing(true);
-                } else {
-                    alert("Incorrect Password! Access denied.");
-                }
-            };
-
-            const handleSaveProfile = async (e) => {
-                e.preventDefault();
-                const updatedPayload = { ...user, ...profileForm };
-                await saveUserProfileInDatabase(updatedPayload, profileForm.password);
-                setIsEditing(false);
-            };
-
-            const getStatusBadge = (status) => {
-                if(status === 'Pending') return <span className="text-orange-600 bg-orange-50 px-2 py-0.5 rounded font-bold">⏳ Processing</span>;
-                if(status === 'Confirmed') return <span className="text-blue-600 bg-blue-50 px-2 py-0.5 rounded font-bold">👍 Confirmed</span>;
-                if(status === 'Shipped') return <span className="text-purple-600 bg-purple-50 px-2 py-0.5 rounded font-bold">🚚 On The Way</span>;
-                if(status === 'Delivered') return <span className="text-green-600 bg-green-50 px-2 py-0.5 rounded font-bold">✅ Delivered</span>;
-                if(status === 'Cancelled') return <span className="text-red-600 bg-red-50 px-2 py-0.5 rounded font-bold">❌ Cancelled</span>;
-                return <span className="text-slate-500">{status}</span>;
-            };
-
             return (
                 <div className="max-w-4xl mx-auto px-4 py-6 pb-24">
-                    <div className="flex justify-between items-center mb-8 pb-4 border-b">
-                        <h1 className="text-3xl font-bold text-slate-900">My Profile</h1>
-                        <button onClick={() => { setUser(null); setCurrentTab('home'); }} className="text-red-600 font-bold flex items-center gap-1"><Icons.LogOut className="w-5 h-5"/> Logout / Sign Out</button>
+                    <div className="flex justify-between items-center mb-8 border-b pb-4">
+                        <h1 className="text-3xl font-bold">My Profile</h1>
+                        <button onClick={() => { setUser(null); setCurrentTab('home'); }} className="text-red-600 font-bold">Logout</button>
                     </div>
-
-                    <div className="bg-white p-6 rounded-xl border border-slate-200 mb-8 shadow-sm">
-                        <div className="flex justify-between items-center mb-4 border-b pb-2">
-                            <h2 className="font-bold text-lg text-slate-800">Account Credentials & Shipping Box</h2>
-                            {!isEditing ? (
-                                <button onClick={triggerPasswordVerification} className="text-sm bg-blue-600 text-white px-4 py-1.5 rounded font-bold shadow-sm">
-                                    Edit Profile
-                                </button>
-                            ) : (
-                                <button onClick={() => setIsEditing(false)} className="text-sm bg-slate-200 text-slate-700 px-4 py-1.5 rounded font-bold">
-                                    Cancel Edit
-                                </button>
-                            )}
+                    <div className="bg-white p-6 rounded-xl border mb-8 shadow-sm">
+                        <div className="flex justify-between items-center mb-4 pb-2 border-b">
+                            <h2 className="font-bold text-lg">Account Details</h2>
+                            <button onClick={() => { if(isEditing || prompt("Enter Password to unlock:") === user.password) setIsEditing(!isEditing); }} className="text-sm bg-blue-50 text-blue-600 px-3 py-1 rounded font-bold">
+                                {isEditing ? 'Cancel' : 'Edit'}
+                            </button>
                         </div>
-                        
                         {!isEditing ? (
-                            <div className="space-y-3 text-slate-700 font-medium">
-                                <p className="border-b pb-1"><span className="text-slate-400 text-sm">Full Name:</span> <br />{user.name || 'Not Filled'}</p>
-                                <p className="border-b pb-1"><span className="text-slate-400 text-sm">Email ID:</span> <br />{user.email}</p>
-                                <p className="border-b pb-1"><span className="text-slate-400 text-sm">Mobile Number:</span> <br />{user.mobile || 'Not Filled'}</p>
-                                <p className="border-b pb-1"><span className="text-slate-400 text-sm">City / Village Address:</span> <br />{user.village || 'Not Filled'}</p>
-                                <p className="border-b pb-1"><span className="text-slate-400 text-sm">Locality / Area / Street:</span> <br />{user.locality || 'Not Filled'}</p>
-                                <p className="border-b pb-1"><span className="text-slate-400 text-sm">Area Pincode:</span> <br />{user.pincode || 'Not Filled'}</p>
+                            <div className="space-y-2 text-sm">
+                                <p><strong>Name:</strong> {user.name}</p>
+                                <p><strong>Email:</strong> {user.email}</p>
+                                <p><strong>Mobile:</strong> {user.mobile}</p>
+                                <p><strong>Address:</strong> {user.village}, {user.locality}, {user.pincode}</p>
                             </div>
                         ) : (
-                            <form onSubmit={handleSaveProfile} className="space-y-4">
-                                <div><label className="text-xs font-bold text-slate-500">Full Name</label><input type="text" className="w-full p-2 border rounded" value={profileForm.name} onChange={e => setProfileForm({...profileForm, name: e.target.value})} required /></div>
-                                <div><label className="text-xs font-bold text-slate-500">Mobile Number</label><input type="tel" className="w-full p-2 border rounded" value={profileForm.mobile} onChange={e => setProfileForm({...profileForm, mobile: e.target.value})} required /></div>
-                                <div><label className="text-xs font-bold text-slate-500">Village / City</label><input type="text" className="w-full p-2 border rounded" value={profileForm.village} onChange={e => setProfileForm({...profileForm, village: e.target.value})} required /></div>
-                                <div><label className="text-xs font-bold text-slate-500">Locality / Street</label><input type="text" className="w-full p-2 border rounded" value={profileForm.locality} onChange={e => setProfileForm({...profileForm, locality: e.target.value})} required /></div>
-                                <div><label className="text-xs font-bold text-slate-500">Pincode</label><input type="number" className="w-full p-2 border rounded" value={profileForm.pincode} onChange={e => setProfileForm({...profileForm, pincode: e.target.value})} required /></div>
-                                <div><label className="text-xs font-bold text-slate-500">Change Password String</label><input type="text" className="w-full p-2 border rounded" value={profileForm.password} onChange={e => setProfileForm({...profileForm, password: e.target.value})} required /></div>
-                                <button type="submit" className="bg-green-600 text-white font-bold text-sm px-6 py-2 rounded-lg shadow">Save Profile Info inside Box</button>
+                            <form onSubmit={async (e) => { e.preventDefault(); await saveUserProfileInDatabase({...user, ...profileForm}, profileForm.password); setIsEditing(false); }} className="space-y-3">
+                                <input type="text" className="w-full p-2 border rounded text-sm" value={profileForm.name} onChange={e => setProfileForm({...profileForm, name: e.target.value})} placeholder="Name" />
+                                <input type="tel" className="w-full p-2 border rounded text-sm" value={profileForm.mobile} onChange={e => setProfileForm({...profileForm, mobile: e.target.value})} placeholder="Mobile" />
+                                <input type="text" className="w-full p-2 border rounded text-sm" value={profileForm.village} onChange={e => setProfileForm({...profileForm, village: e.target.value})} placeholder="Village" />
+                                <input type="text" className="w-full p-2 border rounded text-sm" value={profileForm.locality} onChange={e => setProfileForm({...profileForm, locality: e.target.value})} placeholder="Locality" />
+                                <input type="number" className="w-full p-2 border rounded text-sm" value={profileForm.pincode} onChange={e => setProfileForm({...profileForm, pincode: e.target.value})} placeholder="Pincode" />
+                                <input type="text" className="w-full p-2 border rounded text-sm" value={profileForm.password} onChange={e => setProfileForm({...profileForm, password: e.target.value})} placeholder="New Password" />
+                                <button type="submit" className="bg-green-600 text-white font-bold text-sm px-4 py-2 rounded-lg shadow">Save Info</button>
                             </form>
                         )}
                     </div>
-                    
-                    <h2 className="font-bold text-xl mb-4">My Orders History (Permanent Box)</h2>
-                    {myOrders.length === 0 ? <p className="text-slate-500">No orders found inside your permanent box.</p> : (
-                        <div className="space-y-4">
-                            {myOrders.map(o => (
-                                <div key={o.id} className="bg-white p-4 rounded-xl border shadow-sm">
-                                    <div className="flex justify-between font-bold border-b pb-2 mb-2"><span>ID: {o.id}</span><span>{o.date}</span></div>
-                                    <div className="mb-2 text-sm">{getStatusBadge(o.status)}</div>
-                                    <div className="space-y-2 mt-2">
-                                        {(o.items || []).map((i, idx) => (
-                                            <div key={idx} className="flex flex-col bg-slate-50 p-2 rounded border text-xs space-y-1">
-                                                <div className="flex justify-between font-medium text-slate-800">
-                                                    <span>{i.quantity}x {i.name || 'Product'} ({i.selectedSize?.name || 'Standard'})</span>
-                                                    <span>₹{(parseFloat(i.selectedSize?.price || i.price || 0) * i.quantity).toFixed(2)}</span>
-                                                </div>
-                                                {i.referenceFile && (
-                                                    <div className="flex items-center gap-2 pt-1 border-t border-dashed mt-1">
-                                                        <a href={i.referenceFile} download={`design-${o.id}-${idx}.png`} className="text-[10px] text-blue-600 underline font-bold">View Attached Image</a>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        ))}
+                    <h2 className="font-bold text-xl mb-4">Orders (Permanent Records)</h2>
+                    <div className="space-y-4">
+                        {myOrders.map(o => (
+                            <div key={o.id} className="bg-white p-4 rounded-xl border shadow-sm">
+                                <div className="flex justify-between font-bold border-b pb-2"><span>ID: {o.id}</span><span>{o.date}</span></div>
+                                <div className="my-2 text-sm font-bold text-orange-600">Status: {o.status}</div>
+                                {(o.items || []).map((i, idx) => (
+                                    <div key={idx} className="flex justify-between text-xs py-1">
+                                        <span>{i.quantity}x {i.name}</span>
+                                        <span>₹{(parseFloat(i.selectedSize?.price || i.price || 0) * i.quantity).toFixed(2)}</span>
                                     </div>
-                                    <div className="flex justify-between font-bold mt-3 pt-2 border-t"><span>Total</span><span>₹{(parseFloat(o.total) || 0).toFixed(2)}</span></div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
+                                ))}
+                                <div className="font-bold border-t pt-2 mt-2 text-right">Total: ₹{(parseFloat(o.total) || 0).toFixed(2)}</div>
+                            </div>
+                        ))}
+                    </div>
                 </div>
             );
         }
 
-        // ==========================================
-        // FIXED ADMIN PANEL COMPONENT (TRIPPED WORDS CLEANED)
-        // ==========================================
         function AdminPage({ setCurrentTab }) {
             const { user, products, addOrUpdateProduct, deleteProduct, orders, updateOrderStatus, cancelOrderPermanently, customRequests, deleteCustomRequest, invitedAdmins } = useStore();
             const [adminTab, setAdminTab] = useState('products'); 
@@ -675,51 +536,29 @@
             if (!user || !invitedAdmins.includes(user.email)) return null;
 
             const handleSizeCountChange = (e) => {
-                const count = parseInt(e.target.value, 10);
-                setSizeCount(count);
+                const count = parseInt(e.target.value, 10); setSizeCount(count);
                 setSizes(prev => {
                     const newSizes = [...prev];
-                    if (count > newSizes.length) {
-                        for (let i = newSizes.length; i < count; i++) newSizes.push({ name: '', price: '' });
-                    } else if (count < newSizes.length) { newSizes.length = count; }
-                    return newSizes;
+                    while(newSizes.length < count) newSizes.push({ name: '', price: '' });
+                    newSizes.length = count; return newSizes;
                 });
-            };
-
-            const handleImageUpload = (e) => {
-                const files = Array.from(e.target.files);
-                if (files.length > 0) {
-                    const readers = files.map(file => {
-                        return new Promise((resolve) => {
-                            const reader = new FileReader();
-                            reader.onloadend = () => resolve(reader.result);
-                            reader.readAsDataURL(file);
-                        });
-                    });
-                    Promise.all(readers).then(imagesBase64 => setFormData(prev => ({ ...prev, images: [...prev.images, ...imagesBase64] })));
-                }
             };
 
             const handleSave = (e) => {
                 e.preventDefault();
                 const formattedSizes = sizes.map(s => ({ name: s.name, price: parseFloat(s.price) || 0 }));
-                const payload = { ...formData, sizes: formattedSizes, price: formattedSizes[0]?.price || 0 };
-                if (!formData.id) payload.id = 'p' + Date.now();
-                addOrUpdateProduct(payload).then(() => {
-                    setFormData({ id:'', name: '', description: '', category: '', images: [], fileToCustomer: false });
-                    setView('list');
+                addOrUpdateProduct({ ...formData, sizes: formattedSizes, price: formattedSizes[0]?.price || 0 }).then(() => {
+                    setFormData({ id:'', name: '', description: '', category: '', images: [], fileToCustomer: false }); setView('list');
                 });
             };
 
             return (
                 <div className="max-w-5xl mx-auto px-4 py-6 pb-24">
-                    <h1 className="text-2xl font-bold text-slate-900 mb-6">Admin Dashboard</h1>
-                    <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
-                        <button onClick={() => setAdminTab('products')} className={`px-4 py-2 font-bold text-sm rounded-lg ${adminTab === 'products' ? 'bg-slate-900 text-white' : 'bg-slate-200'}`}>Products</button>
-                        <button onClick={() => setAdminTab('orders')} className={`px-4 py-2 font-bold text-sm rounded-lg ${adminTab === 'orders' ? 'bg-slate-900 text-white' : 'bg-slate-200'}`}>Orders Inbox</button>
-                        <button onClick={() => setAdminTab('customReqs')} className={`px-4 py-2 font-bold text-sm rounded-lg ${adminTab === 'customReqs' ? 'bg-slate-900 text-white' : 'bg-slate-200'}`}>Custom Requests</button>
+                    <h1 className="text-2xl font-bold mb-6">Admin Dashboard</h1>
+                    <div className="flex gap-2 mb-6">
+                        <button onClick={() => setAdminTab('products')} className={`px-4 py-2 font-bold rounded-lg ${adminTab === 'products' ? 'bg-slate-900 text-white' : 'bg-slate-200'}`}>Products</button>
+                        <button onClick={() => setAdminTab('orders')} className={`px-4 py-2 font-bold rounded-lg ${adminTab === 'orders' ? 'bg-slate-900 text-white' : 'bg-slate-200'}`}>Orders Inbox</button>
                     </div>
-
                     {adminTab === 'products' && (
                         <div>
                             <div className="flex justify-end mb-4">
@@ -730,13 +569,7 @@
                                     <table className="w-full text-left text-sm text-slate-600">
                                         <tbody className="divide-y">
                                             {products.map(p => (
-                                                <tr key={p.id}>
-                                                    <td className="px-6 py-4 font-medium text-slate-900 flex items-center gap-2">
-                                                        {p.name} 
-                                                        {p.fileToCustomer && <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 rounded font-bold">File Required</span>}
-                                                    </td>
-                                                    <td className="px-6 py-4 text-right"><button onClick={() => deleteProduct(p.id)} className="text-red-600">Remove</button></td>
-                                                </tr>
+                                                <tr key={p.id} className="hover:bg-slate-50"><td className="px-6 py-4 font-medium text-slate-900">{p.name}</td><td className="px-6 py-4 text-right"><button onClick={() => deleteProduct(p.id)} className="text-red-600">Remove</button></td></tr>
                                             ))}
                                         </tbody>
                                     </table>
@@ -744,18 +577,13 @@
                             )}
                             {view === 'add' && (
                                 <form onSubmit={handleSave} className="bg-white p-6 border rounded-xl space-y-4">
-                                    <input type="text" placeholder="Product Name" required className="w-full p-2 border rounded" onChange={e => setFormData({...formData, name: e.target.value})} />
+                                    <input type="text" placeholder="Product Name" required className="w-full p-2 border rounded" onChange={e => setFormData({...formData, id: 'p'+Date.now(), name: e.target.value})} />
                                     <input type="text" placeholder="Category" required className="w-full p-2 border rounded" onChange={e => setFormData({...formData, category: e.target.value})} />
                                     <textarea placeholder="Description" required className="w-full p-2 border rounded" onChange={e => setFormData({...formData, description: e.target.value})} />
-                                    <input type="file" multiple accept="image/*" className="w-full border p-2" onChange={handleImageUpload} />
-                                    
-                                    <div className="bg-blue-50 p-3 rounded-lg border border-blue-200 flex items-center gap-3">
+                                    <div className="bg-blue-50 p-3 rounded-lg border flex items-center gap-3">
                                         <input type="checkbox" id="fileToCustomer" className="w-5 h-5 accent-blue-600 cursor-pointer" checked={formData.fileToCustomer} onChange={e => setFormData({...formData, fileToCustomer: e.target.checked})} />
-                                        <label htmlFor="fileToCustomer" className="text-sm font-bold text-blue-950 cursor-pointer select-none">
-                                            File to Customer
-                                        </label>
+                                        <label htmlFor="fileToCustomer" className="text-sm font-bold text-blue-950 cursor-pointer">File to Customer (ગ્રાહક પાસેથી ફોટો મંગાવવો)</label>
                                     </div>
-
                                     <select value={sizeCount} onChange={handleSizeCountChange} className="border p-2 rounded bg-white w-full">
                                         {[...Array(10)].map((_, i) => <option key={i+1} value={i+1}>{i+1} Size Options</option>)}
                                     </select>
@@ -770,57 +598,29 @@
                             )}
                         </div>
                     )}
-
                     {adminTab === 'orders' && (
                         <div className="space-y-4">
                             {orders.map(o => (
                                 <div key={o.id} className="bg-white p-5 border rounded-xl shadow-sm">
                                     <div className="flex justify-between font-bold border-b pb-2 mb-2"><span>ID: {o.id}</span><span className="text-blue-600">₹{(parseFloat(o.total) || 0).toFixed(2)}</span></div>
                                     <p className="text-sm">Client: {o.address?.name} ({o.address?.mobile})</p>
-                                    <p className="text-xs text-slate-500 mb-3">Address Box: {o.address?.village}, {o.address?.locality}, {o.address?.pincode}</p>
-                                    
                                     <div className="bg-blue-50 border p-3 rounded-lg my-3 space-y-2">
-                                        <p className="text-xs font-bold text-blue-900 uppercase">📦 Ordered Item blueprints & reference photos:</p>
                                         {(o.items || []).map((item, idx) => (
                                             <div key={idx} className="bg-white p-2 border rounded flex items-center justify-between gap-4">
-                                                <div>
-                                                    <p className="text-xs font-bold text-slate-800">{item.name || 'Product'} (x{item.quantity})</p>
-                                                    <p className="text-[10px] text-slate-500">Size: {item.selectedSize?.name || 'Standard'}</p>
-                                                </div>
-                                                {item.referenceFile ? (
-                                                    <a href={item.referenceFile} target="_blank" download={`print-${o.id}-${idx}.png`} className="block w-16 h-16 border rounded bg-slate-100 overflow-hidden">
-                                                        <img src={item.referenceFile} className="w-full h-full object-cover" />
-                                                    </a>
-                                                ) : (
-                                                    <span className="text-xs text-slate-400 italic">No custom photo required</span>
-                                                )}
+                                                <div><p className="text-xs font-bold">{item.name} (x{item.quantity})</p></div>
+                                                {item.referenceFile && <a href={item.referenceFile} target="_blank" className="block w-12 h-12 border rounded overflow-hidden"><img src={item.referenceFile} className="w-full h-full object-cover" /></a>}
                                             </div>
                                         ))}
                                     </div>
-
-                                    <div className="mt-4 flex justify-between items-center flex-wrap gap-2 border-t pt-2">
-                                        <span className={`text-xs px-2.5 py-1 rounded font-bold ${o.status === 'Cancelled' ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'}`}>Status: {o.status}</span>
+                                    <div className="mt-4 flex justify-between items-center border-t pt-2">
+                                        <span className="text-xs px-2.5 py-1 rounded font-bold bg-orange-100 text-orange-700">Status: {o.status}</span>
                                         <div className="flex gap-2">
-                                            {o.status === 'Pending' && <button onClick={() => updateOrderStatus(o.id, 'Confirmed')} className="bg-blue-600 text-white text-xs px-3 py-1.5 rounded font-bold">Confirm</button>}
-                                            {o.status === 'Confirmed' && <button onClick={() => updateOrderStatus(o.id, 'Shipped')} className="bg-purple-600 text-white text-xs px-3 py-1.5 rounded font-bold">Ship Order</button>}
-                                            {o.status === 'Shipped' && <button onClick={() => updateOrderStatus(o.id, 'Delivered')} className="bg-green-600 text-white text-xs px-3 py-1.5 rounded font-bold">Mark Delivered</button>}
-                                            {o.status !== 'Cancelled' && o.status !== 'Delivered' && o.status !== 'Shipped' && (
-                                                <button onClick={() => cancelOrderPermanently(o.id)} className="bg-red-600 text-white text-xs px-3 py-1.5 rounded font-bold">Cancel Order</button>
-                                            )}
+                                            {o.status === 'Pending' && <button onClick={() => updateOrderStatus(o.id, 'Confirmed')} className="bg-blue-600 text-white text-xs px-3 py-1 rounded font-bold">Confirm</button>}
+                                            {o.status === 'Confirmed' && <button onClick={() => updateOrderStatus(o.id, 'Shipped')} className="bg-purple-600 text-white text-xs px-3 py-1 rounded font-bold">Ship</button>}
+                                            {o.status === 'Shipped' && <button onClick={() => updateOrderStatus(o.id, 'Delivered')} className="bg-green-600 text-white text-xs px-3 py-1 rounded font-bold">Deliver</button>}
+                                            {o.status !== 'Cancelled' && o.status !== 'Delivered' && o.status !== 'Shipped' && <button onClick={() => cancelOrderPermanently(o.id)} className="bg-red-600 text-white text-xs px-3 py-1 rounded font-bold">Cancel Order</button>}
                                         </div>
                                     </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-
-                    {adminTab === 'customReqs' && (
-                        <div className="space-y-4">
-                            {customRequests.map(req => (
-                                <div key={req.id} className="bg-white p-5 border rounded-xl shadow-sm">
-                                    <div className="flex justify-between font-bold"><h3>{req.modelName}</h3><span>{req.date}</span></div>
-                                    <p className="text-sm text-slate-600 bg-slate-50 p-2 mt-2 rounded">{req.instructions}</p>
-                                    <div className="pt-2 flex justify-end"><button onClick={() => deleteCustomRequest(req.id)} className="text-red-600 text-xs font-bold">Remove Request</button></div>
                                 </div>
                             ))}
                         </div>
@@ -836,55 +636,57 @@
             const [error, setError] = useState('');
 
             const handleSubmit = async (e) => {
-                e.preventDefault();
-                setError('');
+                e.preventDefault(); setError('');
+                
+                // Front-end safeguard verification rule for password length
+                if (!isLogin && formData.password.length < 6) {
+                    setError('પાસવર્ડ ઓછામાં ઓછો 6 અક્ષરનો હોવો જોઈએ!');
+                    return;
+                }
+
                 try {
+                    const cleanEmail = formData.email.replace(/[.#$/\[\]]/g, "_");
                     if (isLogin) {
                         const credential = await window.fbAuth.signInWithEmailAndPassword(window.auth, formData.email, formData.password);
-                        const cleanEmail = formData.email.replace(/[.#$/\[\]]/g, "_");
-                        
-                        const docRef = window.fb.doc(window.db, "users", cleanEmail);
-                        const docSnap = await window.fb.getDoc(docRef);
-                        if (docSnap.exists()) {
-                            setUser(docSnap.data());
-                        } else {
-                            setUser({ email: credential.user.email, name: formData.email.split('@')[0], password: formData.password });
-                        }
-                        setCurrentTab('home');
+                        const docSnap = await window.fb.getDoc(window.fb.doc(window.db, "users", cleanEmail));
+                        setUser(docSnap.exists() ? docSnap.data() : { email: credential.user.email, name: formData.email.split('@')[0], password: formData.password });
                     } else {
                         const credential = await window.fbAuth.createUserWithEmailAndPassword(window.auth, formData.email, formData.password);
-                        const cleanEmail = formData.email.replace(/[.#$/\[\]]/g, "_");
-                        
-                        const initialUserPayload = { ...formData, uid: credential.user.uid };
-                        await window.fb.setDoc(window.fb.doc(window.db, "users", cleanEmail), initialUserPayload);
-                        
-                        setUser(initialUserPayload);
-                        setCurrentTab('home');
+                        const payload = { ...formData, uid: credential.user.uid };
+                        await window.fb.setDoc(window.fb.doc(window.db, "users", cleanEmail), payload); 
+                        setUser(payload);
                     }
+                    setCurrentTab('home');
                 } catch (err) { 
-                    setError('Authentication Failed.'); 
+                    if (err.code === "auth/email-already-in-use") {
+                        setError("આ ઇમેઇલ આઇડી પહેલેથી રજીસ્ટર થયેલું છે!");
+                    } else if (err.code === "auth/wrong-password" || err.code === "auth/user-not-found") {
+                        setError("ખોટો ઇમેઇલ અથવા પાસવર્ડ!");
+                    } else {
+                        setError("ભૂલ: વિગતો ચકાસો અને ફરી પ્રયાસ કરો.");
+                    }
                 }
             };
 
             return (
                 <div className="max-w-md mx-auto mt-10 mb-24 bg-white p-8 border rounded-xl shadow-sm">
-                    <h2 className="text-2xl font-bold text-center mb-6">{isLogin ? 'Sign In' : 'Create Account (Open Box)'}</h2>
-                    {error && <div className="mb-4 p-2 bg-red-50 text-red-600 text-center text-sm">{error}</div>}
+                    <h2 className="text-2xl font-bold text-center mb-6">{isLogin ? 'Sign In / લોગિન' : 'Create Account / નવું ખાતું'}</h2>
+                    {error && <div className="mb-4 p-2 bg-red-50 text-red-600 text-center text-sm font-bold rounded">{error}</div>}
                     <form onSubmit={handleSubmit} className="space-y-4">
                         {!isLogin && (
                             <>
-                                <input type="text" placeholder="Full Name" required className="w-full p-2 border rounded" onChange={e => setFormData({...formData, name: e.target.value})} />
-                                <input type="tel" placeholder="Mobile Number" required className="w-full p-2 border rounded" onChange={e => setFormData({...formData, mobile: e.target.value})} />
-                                <input type="text" placeholder="City / Village Address" required className="w-full p-2 border rounded" onChange={e => setFormData({...formData, village: e.target.value})} />
-                                <input type="text" placeholder="Locality / Area / Street" required className="w-full p-2 border rounded" onChange={e => setFormData({...formData, locality: e.target.value})} />
-                                <input type="number" placeholder="Area Pincode" required className="w-full p-2 border rounded" onChange={e => setFormData({...formData, pincode: e.target.value})} />
+                                <input type="text" placeholder="પૂરું નામ (Full Name)" required className="w-full p-2 border rounded" onChange={e => setFormData({...formData, name: e.target.value})} />
+                                <input type="tel" placeholder="મોબાઇલ નંબર (Mobile)" required className="w-full p-2 border rounded" onChange={e => setFormData({...formData, mobile: e.target.value})} />
+                                <input type="text" placeholder="ગામ / શહેર (City/Village)" required className="w-full p-2 border rounded" onChange={e => setFormData({...formData, village: e.target.value})} />
+                                <input type="text" placeholder="સોસાયટી / વિસ્તાર (Locality)" required className="w-full p-2 border rounded" onChange={e => setFormData({...formData, locality: e.target.value})} />
+                                <input type="number" placeholder="પિનકોડ (Pincode)" required className="w-full p-2 border rounded" onChange={e => setFormData({...formData, pincode: e.target.value})} />
                             </>
                         )}
-                        <input type="email" placeholder="Email Address" required className="w-full p-2 border rounded" onChange={e => setFormData({...formData, email: e.target.value})} />
-                        <input type="password" placeholder="Password" required className="w-full p-2 border rounded" onChange={e => setFormData({...formData, password: e.target.value})} />
-                        <button type="submit" className="w-full bg-blue-600 text-white py-2 rounded font-medium">{isLogin ? 'Sign In' : 'Sign Up & Create Box'}</button>
+                        <input type="email" placeholder="ઇમેઇલ એડ્રેસ (Email)" required className="w-full p-2 border rounded" onChange={e => setFormData({...formData, email: e.target.value})} />
+                        <input type="password" placeholder="પાસવર્ડ (Password - Min 6 letters)" required className="w-full p-2 border rounded" onChange={e => setFormData({...formData, password: e.target.value})} />
+                        <button type="submit" className="w-full bg-blue-600 text-white py-2 rounded font-bold shadow">{isLogin ? 'Sign In' : 'Sign Up & Create Box'}</button>
                     </form>
-                    <div className="mt-4 text-center text-sm"><button onClick={() => setIsLogin(!isLogin)} className="text-blue-600 font-bold">{isLogin ? 'Open a New Account Box' : 'Login to Existing Box'}</button></div>
+                    <div className="mt-4 text-center text-sm"><button onClick={() => { setIsLogin(!isLogin); setError(''); }} className="text-blue-600 font-bold">{isLogin ? 'નવું ખાતું ખોલો (Register)' : 'પહેલેથી ખાતું છે? લોગિન કરો'}</button></div>
                 </div>
             );
         }
@@ -908,9 +710,7 @@
                 <div className="min-h-screen">
                     <header className="bg-white border-b sticky top-0 z-40 shadow-sm">
                         <div className="max-w-7xl mx-auto px-4 h-14 flex justify-between items-center">
-                            <button onClick={() => setCurrentTab('home')} className="text-xl font-bold text-slate-900 flex items-center gap-2">
-                                <Icons.PackagePlus className="w-6 h-6 text-blue-600" /> Customize shop
-                            </button>
+                            <button onClick={() => setCurrentTab('home')} className="text-xl font-bold text-slate-900 flex items-center gap-2"><Icons.PackagePlus className="w-6 h-6 text-blue-600" /> Customize shop</button>
                         </div>
                     </header>
                     <main>
