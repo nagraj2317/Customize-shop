@@ -102,7 +102,6 @@
             
             useEffect(() => { localStorage.setItem('app_cart', JSON.stringify(cart)); }, [cart]);
 
-            // FIREBASE SYNC + AUTOMATIC DELETED PRODUCT CART CLEANUP
             useEffect(() => {
                 if (!isFirebaseReady) return;
 
@@ -111,7 +110,6 @@
                     snapshot.forEach(doc => prods.push(doc.data()));
                     setProducts(prods);
 
-                    // FEATURE IMPLEMENTED: Auto-remove deleted items from current user cart
                     if (cart && cart.length > 0) {
                         const validProductIds = prods.map(p => p.id);
                         setCart(prevCart => prevCart.filter(item => validProductIds.includes(item.id)));
@@ -214,7 +212,7 @@
                     <div className="min-h-screen flex items-center justify-center bg-slate-50">
                         <div className="text-center">
                             <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                            <p className="text-slate-600 font-bold text-lg">Loading Store Box...</p>
+                            <p className="text-slate-600 font-bold text-lg">Loading Store...</p>
                         </div>
                     </div>
                 );
@@ -245,7 +243,7 @@
                     </div>
                     <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
                         {products.length === 0 ? (
-                            <div className="col-span-full text-center py-20 bg-white rounded-xl border text-slate-500">No products available at the moment.</div>
+                            <div className="col-span-full text-center py-20 bg-white rounded-xl border text-slate-500">No products available.</div>
                         ) : (
                             products.map(product => <ProductCard key={product.id} product={product} addToCart={addToCart} setCurrentTab={setCurrentTab} setSelectedProduct={setSelectedProduct} />)
                         )}
@@ -533,6 +531,9 @@
             );
         }
 
+        // ==========================================
+        // ADMIN PANEL WITH CRASH-FREE PHOTO POPUP SYSTEM
+        // ==========================================
         function AdminPage({ setCurrentTab }) {
             const { user, products, addOrUpdateProduct, deleteProduct, orders, updateOrderStatus, cancelOrderPermanently, customRequests, deleteCustomRequest, invitedAdmins } = useStore();
             const [adminTab, setAdminTab] = useState('products'); 
@@ -540,6 +541,9 @@
             const [formData, setFormData] = useState({ id:'', name: '', description: '', category: '', images: [], fileToCustomer: false });
             const [sizeCount, setSizeCount] = useState(1);
             const [sizes, setSizes] = useState([{ name: '', price: '' }]);
+            
+            // NEW MODAL STATES FOR ENLARGING PHOTO WITHOUT CRASHING SCREEN
+            const [selectedPreviewImage, setSelectedPreviewImage] = useState(null);
 
             if (!user || !invitedAdmins.includes(user.email)) return null;
 
@@ -567,6 +571,7 @@
                         <button onClick={() => setAdminTab('products')} className={`px-4 py-2 font-bold rounded-lg ${adminTab === 'products' ? 'bg-slate-900 text-white' : 'bg-slate-200'}`}>Products</button>
                         <button onClick={() => setAdminTab('orders')} className={`px-4 py-2 font-bold rounded-lg ${adminTab === 'orders' ? 'bg-slate-900 text-white' : 'bg-slate-200'}`}>Orders Inbox</button>
                     </div>
+                    
                     {adminTab === 'products' && (
                         <div>
                             <div className="flex justify-end mb-4">
@@ -606,6 +611,7 @@
                             )}
                         </div>
                     )}
+
                     {adminTab === 'orders' && (
                         <div className="space-y-4">
                             {orders.map(o => (
@@ -616,7 +622,13 @@
                                         {(o.items || []).map((item, idx) => (
                                             <div key={idx} className="bg-white p-2 border rounded flex items-center justify-between gap-4">
                                                 <div><p className="text-xs font-bold">{item.name} (x{item.quantity})</p></div>
-                                                {item.referenceFile && <a href={item.referenceFile} target="_blank" className="block w-12 h-12 border rounded overflow-hidden"><img src={item.referenceFile} className="w-full h-full object-cover" /></a>}
+                                                
+                                                {/* FIXED CRASH LOGIC: Div Click instead of Anchor tags opens internal popup secure Modal */}
+                                                {item.referenceFile && (
+                                                    <div onClick={() => setSelectedPreviewImage(item.referenceFile)} className="block w-12 h-12 border rounded overflow-hidden cursor-pointer active:scale-95 transition-transform bg-slate-100">
+                                                        <img src={item.referenceFile} className="w-full h-full object-cover" alt="Blueprint" />
+                                                    </div>
+                                                )}
                                             </div>
                                         ))}
                                     </div>
@@ -633,6 +645,36 @@
                             ))}
                         </div>
                     )}
+
+                    {adminTab === 'customReqs' && (
+                        <div className="space-y-4">
+                            {customRequests.map(req => (
+                                <div key={req.id} className="bg-white p-5 border rounded-xl shadow-sm">
+                                    <div className="flex justify-between font-bold"><h3>{req.modelName}</h3><span>{req.date}</span></div>
+                                    <p className="text-sm text-slate-600 bg-slate-50 p-2 mt-2 rounded">{req.instructions}</p>
+                                    <div className="pt-2 flex justify-end"><button onClick={() => deleteCustomRequest(req.id)} className="text-red-600 text-xs font-bold">Remove Request</button></div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* NEW CRASH-FREE ENLARGE POPUP BOX SYSTEM MODAL */}
+                    {selectedPreviewImage && (
+                        <div className="fixed inset-0 bg-black/80 z-50 flex flex-col items-center justify-center p-4">
+                            <div className="max-w-3xl w-full bg-white rounded-2xl overflow-hidden p-3 flex flex-col shadow-2xl animate-fade-in">
+                                <div className="flex justify-between items-center mb-2 px-2">
+                                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wide">Customer Blueprint Design View</span>
+                                    <button onClick={() => setSelectedPreviewImage(null)} className="bg-red-600 text-white font-bold text-xs px-4 py-1.5 rounded-lg active:scale-95 transition-transform">
+                                        Close (બંધ કરો)
+                                    </button>
+                                </div>
+                                <div className="w-full aspect-square md:max-h-[70vh] bg-slate-100 rounded-xl overflow-auto flex items-center justify-center border">
+                                    <img src={selectedPreviewImage} className="max-w-full max-h-full object-contain rounded" alt="Enlarged Blueprint View" />
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                 </div>
             );
         }
@@ -675,7 +717,7 @@
                             <>
                                 <input type="text" placeholder="પૂરું નામ (Full Name)" required className="w-full p-2 border rounded" onChange={e => setFormData({...formData, name: e.target.value})} />
                                 <input type="tel" placeholder="મોબાઇલ નંબર (Mobile)" required className="w-full p-2 border rounded" onChange={e => setFormData({...formData, mobile: e.target.value})} />
-                                <input type="text" placeholder="ગામ / શહેર" required className="w-full p-2 border rounded" onChange={e => setFormData({...formData, village: e.target.value})} />
+                                <input type="text" placeholder="ગામ / şehir" required className="w-full p-2 border rounded" onChange={e => setFormData({...formData, village: e.target.value})} />
                                 <input type="text" placeholder="વિસ્તાર / સોસાયટી" required className="w-full p-2 border rounded" onChange={e => setFormData({...formData, locality: e.target.value})} />
                                 <input type="number" placeholder="પિનકોડ (Pincode)" required className="w-full p-2 border rounded" onChange={e => setFormData({...formData, pincode: e.target.value})} />
                             </>
