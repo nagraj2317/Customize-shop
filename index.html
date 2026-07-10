@@ -402,11 +402,19 @@
             );
         }
 
+        // ==========================================
+        // FIXED CART PAGE: CRASH EXCEPTION GUARD ADDED
+        // ==========================================
         function CartPage({ setCurrentTab }) {
             const { cart, removeFromCart, updateQuantity, clearCart, user, addOrder, updateCartItemFile } = useStore();
             const [isCheckingOut, setIsCheckingOut] = useState(false);
             const [success, setSuccess] = useState(false);
-            const total = cart.reduce((sum, item) => sum + (parseFloat(item.selectedSize?.price || item.price) * item.quantity), 0);
+            
+            // Safe Total Calculation logic using parseFloat with fallback to 0
+            const total = cart.reduce((sum, item) => {
+                const basePrice = item.selectedSize?.price || item.price || 0;
+                return sum + (parseFloat(basePrice) * (parseInt(item.quantity, 10) || 1));
+            }, 0);
 
             const handleFileChange = (index, e) => {
                 const file = e.target.files[0];
@@ -479,7 +487,9 @@
                                             <div className="flex-1 text-center sm:text-left">
                                                 <h3 className="font-semibold text-lg text-slate-900">{item.name}</h3>
                                                 <p className="text-xs text-slate-400">Size: {item.selectedSize?.name || 'Standard'}</p>
-                                                <p className="font-bold text-blue-600">₹{parseFloat(item.selectedSize?.price || item.price).toFixed(2)}</p>
+                                                <p className="font-bold text-blue-600">
+                                                    ₹{parseFloat(item.selectedSize?.price || item.price || 0).toFixed(2)}
+                                                </p>
                                             </div>
                                             <div className="flex items-center gap-4">
                                                 <div className="flex items-center gap-2 bg-slate-50 border rounded-lg p-1">
@@ -516,7 +526,9 @@
                             <div className="lg:col-span-1">
                                 <div className="bg-white p-6 rounded-xl border shadow-sm sticky top-20">
                                     <h2 className="text-xl font-bold mb-6">Order Summary</h2>
-                                    <div className="flex justify-between font-bold text-lg border-t pt-4 mb-4"><span>Total</span><span>₹{total.toFixed(2)}</span></div>
+                                    <div className="flex justify-between font-bold text-lg border-t pt-4 mb-4">
+                                        <span>Total</span><span>₹{total.toFixed(2)}</span>
+                                    </div>
                                     <button onClick={handleCheckout} disabled={isCheckingOut} className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow transition">
                                         Confirm & Checkout Order
                                     </button>
@@ -631,7 +643,7 @@
                                             <div key={idx} className="flex flex-col bg-slate-50 p-2 rounded border text-xs space-y-1">
                                                 <div className="flex justify-between font-medium text-slate-800">
                                                     <span>{i.quantity}x {i.name} ({i.selectedSize?.name || 'Standard'})</span>
-                                                    <span>₹{(parseFloat(i.selectedSize?.price || i.price) * i.quantity).toFixed(2)}</span>
+                                                    <span>₹{(parseFloat(i.selectedSize?.price || i.price || 0) * i.quantity).toFixed(2)}</span>
                                                 </div>
                                                 {i.referenceFile && (
                                                     <div className="flex items-center gap-2 pt-1 border-t border-dashed mt-1">
@@ -641,8 +653,7 @@
                                             </div>
                                         ))}
                                     </div>
-                                    {/* FIXED SYNTAX ERROR: o.total enclosed inside parenthesis properly */}
-                                    <div className="flex justify-between font-bold mt-3 pt-2 border-t"><span>Total</span><span>₹{(o.total || 0).toFixed(2)}</span></div>
+                                    <div className="flex justify-between font-bold mt-3 pt-2 border-t"><span>Total</span><span>₹{(parseFloat(o.total) || 0).toFixed(2)}</span></div>
                                 </div>
                             ))}
                         </div>
@@ -739,7 +750,7 @@
                                     <div className="bg-blue-50 p-3 rounded-lg border border-blue-200 flex items-center gap-3">
                                         <input type="checkbox" id="fileToCustomer" className="w-5 h-5 accent-blue-600 cursor-pointer" checked={formData.fileToCustomer} onChange={e => setFormData({...formData, fileToCustomer: e.target.checked})} />
                                         <label htmlFor="fileToCustomer" className="text-sm font-bold text-blue-950 cursor-pointer select-none">
-                                            File to Customer (ગ્રાહક પાસેથી આ પ્રોડક્ટ માટે ફરજિયાત ફોટો મંગાવવા આ બોક્સ સિલેક્ટ કરો)
+                                            File to Customer
                                         </label>
                                     </div>
 
@@ -762,7 +773,7 @@
                         <div className="space-y-4">
                             {orders.map(o => (
                                 <div key={o.id} className="bg-white p-5 border rounded-xl shadow-sm">
-                                    <div className="flex justify-between font-bold border-b pb-2 mb-2"><span>ID: {o.id}</span><span className="text-blue-600">₹{(o.total || 0).toFixed(2)}</span></div>
+                                    <div className="flex justify-between font-bold border-b pb-2 mb-2"><span>ID: {o.id}</span><span className="text-blue-600">₹{(parseFloat(o.total) || 0).toFixed(2)}</span></div>
                                     <p className="text-sm">Client: {o.address?.name} ({o.address?.mobile})</p>
                                     <p className="text-xs text-slate-500 mb-3">Address Box: {o.address?.village}, {o.address?.locality}, {o.address?.pincode}</p>
                                     
