@@ -40,7 +40,7 @@
         window.fb = { collection, doc, setDoc, deleteDoc, onSnapshot, getDoc };
         window.fbAuth = { signInWithEmailAndPassword, createUserWithEmailAndPassword, updatePassword };
         
-        console.log("Firebase system initialized successfully.");
+        console.log("Firebase system ready.");
     </script>
 </head>
 <body>
@@ -66,7 +66,7 @@
         };
 
         // ==========================================
-        // 2. STATE MANAGEMENT
+        // 2. STATE MANAGEMENT & AUTO CLEANUP
         // ==========================================
         const AppContext = createContext(undefined);
 
@@ -99,8 +99,10 @@
                 if(user) localStorage.setItem('app_user', JSON.stringify(user)); 
                 else localStorage.removeItem('app_user'); 
             }, [user]);
+            
             useEffect(() => { localStorage.setItem('app_cart', JSON.stringify(cart)); }, [cart]);
 
+            // FIREBASE SYNC + AUTOMATIC DELETED PRODUCT CART CLEANUP
             useEffect(() => {
                 if (!isFirebaseReady) return;
 
@@ -108,6 +110,12 @@
                     const prods = [];
                     snapshot.forEach(doc => prods.push(doc.data()));
                     setProducts(prods);
+
+                    // FEATURE IMPLEMENTED: Auto-remove deleted items from current user cart
+                    if (cart && cart.length > 0) {
+                        const validProductIds = prods.map(p => p.id);
+                        setCart(prevCart => prevCart.filter(item => validProductIds.includes(item.id)));
+                    }
                 });
 
                 const unsubOrders = window.fb.onSnapshot(window.fb.collection(window.db, "orders"), (snapshot) => {
@@ -206,7 +214,7 @@
                     <div className="min-h-screen flex items-center justify-center bg-slate-50">
                         <div className="text-center">
                             <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                            <p className="text-slate-600 font-bold text-lg">Loading Store...</p>
+                            <p className="text-slate-600 font-bold text-lg">Loading Store Box...</p>
                         </div>
                     </div>
                 );
@@ -237,7 +245,7 @@
                     </div>
                     <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
                         {products.length === 0 ? (
-                            <div className="col-span-full text-center py-20 bg-white rounded-xl border text-slate-500">No products available.</div>
+                            <div className="col-span-full text-center py-20 bg-white rounded-xl border text-slate-500">No products available at the moment.</div>
                         ) : (
                             products.map(product => <ProductCard key={product.id} product={product} addToCart={addToCart} setCurrentTab={setCurrentTab} setSelectedProduct={setSelectedProduct} />)
                         )}
@@ -637,13 +645,9 @@
 
             const handleSubmit = async (e) => {
                 e.preventDefault(); setError('');
-                
-                // Front-end safeguard verification rule for password length
                 if (!isLogin && formData.password.length < 6) {
-                    setError('પાસવર્ડ ઓછામાં ઓછો 6 અક્ષરનો હોવો જોઈએ!');
-                    return;
+                    setError('પાસવર્ડ ઓછામાં ઓછો 6 અક્ષરનો હોવો જોઈએ!'); return;
                 }
-
                 try {
                     const cleanEmail = formData.email.replace(/[.#$/\[\]]/g, "_");
                     if (isLogin) {
@@ -653,40 +657,34 @@
                     } else {
                         const credential = await window.fbAuth.createUserWithEmailAndPassword(window.auth, formData.email, formData.password);
                         const payload = { ...formData, uid: credential.user.uid };
-                        await window.fb.setDoc(window.fb.doc(window.db, "users", cleanEmail), payload); 
-                        setUser(payload);
+                        await window.fb.setDoc(window.fb.doc(window.db, "users", cleanEmail), payload); setUser(payload);
                     }
                     setCurrentTab('home');
                 } catch (err) { 
-                    if (err.code === "auth/email-already-in-use") {
-                        setError("આ ઇમેઇલ આઇડી પહેલેથી રજીસ્ટર થયેલું છે!");
-                    } else if (err.code === "auth/wrong-password" || err.code === "auth/user-not-found") {
-                        setError("ખોટો ઇમેઇલ અથવા પાસવર્ડ!");
-                    } else {
-                        setError("ભૂલ: વિગતો ચકાસો અને ફરી પ્રયાસ કરો.");
-                    }
+                    if (err.code === "auth/email-already-in-use") setError("આ ઇમેઇલ આઇડી પહેલેથી રજીસ્ટર છે!");
+                    else setError("ખોટો ઇમેઇલ અથવા પાસવર્ડ!");
                 }
             };
 
             return (
                 <div className="max-w-md mx-auto mt-10 mb-24 bg-white p-8 border rounded-xl shadow-sm">
-                    <h2 className="text-2xl font-bold text-center mb-6">{isLogin ? 'Sign In / લોગિન' : 'Create Account / નવું ખાતું'}</h2>
+                    <h2 className="text-2xl font-bold text-center mb-6">{isLogin ? 'Sign In / લોગિન' : 'Create Account / રજીસ્ટ્રેશન'}</h2>
                     {error && <div className="mb-4 p-2 bg-red-50 text-red-600 text-center text-sm font-bold rounded">{error}</div>}
                     <form onSubmit={handleSubmit} className="space-y-4">
                         {!isLogin && (
                             <>
                                 <input type="text" placeholder="પૂરું નામ (Full Name)" required className="w-full p-2 border rounded" onChange={e => setFormData({...formData, name: e.target.value})} />
                                 <input type="tel" placeholder="મોબાઇલ નંબર (Mobile)" required className="w-full p-2 border rounded" onChange={e => setFormData({...formData, mobile: e.target.value})} />
-                                <input type="text" placeholder="ગામ / શહેર (City/Village)" required className="w-full p-2 border rounded" onChange={e => setFormData({...formData, village: e.target.value})} />
-                                <input type="text" placeholder="સોસાયટી / વિસ્તાર (Locality)" required className="w-full p-2 border rounded" onChange={e => setFormData({...formData, locality: e.target.value})} />
+                                <input type="text" placeholder="ગામ / શહેર" required className="w-full p-2 border rounded" onChange={e => setFormData({...formData, village: e.target.value})} />
+                                <input type="text" placeholder="વિસ્તાર / સોસાયટી" required className="w-full p-2 border rounded" onChange={e => setFormData({...formData, locality: e.target.value})} />
                                 <input type="number" placeholder="પિનકોડ (Pincode)" required className="w-full p-2 border rounded" onChange={e => setFormData({...formData, pincode: e.target.value})} />
                             </>
                         )}
-                        <input type="email" placeholder="ઇમેઇલ એડ્રેસ (Email)" required className="w-full p-2 border rounded" onChange={e => setFormData({...formData, email: e.target.value})} />
-                        <input type="password" placeholder="પાસવર્ડ (Password - Min 6 letters)" required className="w-full p-2 border rounded" onChange={e => setFormData({...formData, password: e.target.value})} />
+                        <input type="email" placeholder="ઇમેઇલ (Email)" required className="w-full p-2 border rounded" onChange={e => setFormData({...formData, email: e.target.value})} />
+                        <input type="password" placeholder="પાસવર્ડ (Password)" required className="w-full p-2 border rounded" onChange={e => setFormData({...formData, password: e.target.value})} />
                         <button type="submit" className="w-full bg-blue-600 text-white py-2 rounded font-bold shadow">{isLogin ? 'Sign In' : 'Sign Up & Create Box'}</button>
                     </form>
-                    <div className="mt-4 text-center text-sm"><button onClick={() => { setIsLogin(!isLogin); setError(''); }} className="text-blue-600 font-bold">{isLogin ? 'નવું ખાતું ખોલો (Register)' : 'પહેલેથી ખાતું છે? લોગિન કરો'}</button></div>
+                    <div className="mt-4 text-center text-sm"><button onClick={() => { setIsLogin(!isLogin); setError(''); }} className="text-blue-600 font-bold">{isLogin ? 'નવું ખાતું ખોલો' : 'લોગિન કરો'}</button></div>
                 </div>
             );
         }
