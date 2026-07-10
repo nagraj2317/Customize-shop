@@ -77,7 +77,6 @@
             const updateQuantity = (index, quantity) => setCart(prev => prev.map((item, i) => i === index ? { ...item, quantity } : item));
             const clearCart = () => setCart([]);
             
-            // નવું ફંક્શન: ઓર્ડર સ્ટેટસ બદલવા માટે
             const updateOrderStatus = (orderId, newStatus) => {
                 setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
             };
@@ -241,7 +240,6 @@
                 if (cart.length === 0) return;
                 setIsCheckingOut(true);
                 setTimeout(() => {
-                    // નવું: ઓર્ડર મુકતી વખતે status 'Pending' સેટ કર્યું છે
                     setOrders(prev => [{ 
                         id: 'ORD-' + Date.now(), 
                         userId: user.email, 
@@ -249,7 +247,7 @@
                         items: [...cart], 
                         total, 
                         date: new Date().toLocaleDateString(),
-                        status: 'Pending' // <--- STATUS ADDED HERE
+                        status: 'Pending'
                     }, ...prev]);
                     clearCart();
                     setSuccess(true);
@@ -333,7 +331,6 @@
             if (!user) { setCurrentTab('auth'); return null; }
             const myOrders = orders.filter(o => o.userId === user.email);
 
-            // યુઝર માટે સ્ટેટસનો મેસેજ નક્કી કરવાનું ફંક્શન
             const getStatusMessage = (status) => {
                 if(status === 'Pending') return <span className="text-orange-500">⏳ Processing</span>;
                 if(status === 'Confirmed') return <span className="text-blue-600">👍 Confirmed</span>;
@@ -367,12 +364,9 @@
                                         <span>{o.id}</span>
                                         <span>{o.date}</span>
                                     </div>
-                                    
-                                    {/* નવું: યુઝરને અહીં સ્ટેટસ દેખાશે */}
                                     <div className="mb-3 font-bold text-sm bg-slate-50 p-2 rounded">
                                         Status: {getStatusMessage(o.status)}
                                     </div>
-
                                     {o.items.map(i => <div key={i.id} className="flex justify-between text-sm py-1"><span>{i.quantity}x {i.name} ({i.selectedSize?.name})</span><span>₹{(parseFloat(i.selectedSize?.price || i.price) * i.quantity).toFixed(2)}</span></div>)}
                                     <div className="flex justify-between font-bold mt-3 pt-2 border-t"><span>Total</span><span>₹{o.total.toFixed(2)}</span></div>
                                 </div>
@@ -583,18 +577,30 @@
                                             </div>
                                         </div>
 
-                                        {/* નવું: ઓર્ડરમાં ક્વોન્ટિટી સ્પષ્ટ બતાવે છે */}
+                                        {/* નવો સુધારો: ઓર્ડરમાં ફોટો, નામ અને ક્વોન્ટિટી સ્પષ્ટ બતાવે છે */}
                                         <div className="mt-4 p-3 bg-blue-50 border border-blue-100 rounded-lg">
-                                            <p className="font-bold text-blue-900 border-b border-blue-200 pb-1 mb-2">Items to Pack (ક્વોન્ટિટી):</p>
-                                            {o.items.map((item, idx) => (
-                                                <div key={idx} className="flex justify-between text-sm py-1 font-medium text-slate-800">
-                                                    <span>➡️ {item.quantity} x {item.name} ({item.selectedSize?.name})</span>
-                                                    <span>₹{(parseFloat(item.selectedSize?.price || item.price) * item.quantity).toFixed(2)}</span>
-                                                </div>
-                                            ))}
+                                            <p className="font-bold text-blue-900 border-b border-blue-200 pb-2 mb-3">Items to Pack (ફોટો અને ક્વોન્ટિટી):</p>
+                                            <div className="space-y-3">
+                                                {o.items.map((item, idx) => {
+                                                    const itemImage = item.images && item.images.length > 0 ? item.images[0] : (item.imageUrl || 'https://via.placeholder.com/100');
+                                                    return (
+                                                        <div key={idx} className="flex items-center justify-between bg-white p-2 rounded-lg border border-blue-100 shadow-sm">
+                                                            <div className="flex items-center gap-4">
+                                                                {/* અહીં પ્રોડક્ટનો ફોટો દેખાશે */}
+                                                                <img src={itemImage} alt={item.name} className="w-14 h-14 object-cover rounded border border-slate-200" />
+                                                                <div>
+                                                                    <p className="font-bold text-slate-800 leading-tight">{item.name}</p>
+                                                                    <p className="text-xs text-slate-500 mb-1">સાઇઝ: {item.selectedSize?.name || 'Standard'}</p>
+                                                                    <p className="text-sm font-black text-blue-700">Quantity: {item.quantity}</p>
+                                                                </div>
+                                                            </div>
+                                                            <span className="font-bold text-slate-800 pr-2">₹{(parseFloat(item.selectedSize?.price || item.price) * item.quantity).toFixed(2)}</span>
+                                                        </div>
+                                                    )
+                                                })}
+                                            </div>
                                         </div>
 
-                                        {/* નવું: સ્ટેટસ બદલવાના એક્શન બટન્સ */}
                                         <div className="mt-4 flex flex-col sm:flex-row items-center justify-between border-t pt-4 gap-4">
                                             <div className={`text-sm font-bold px-3 py-1.5 rounded-full border ${o.status === 'Pending' ? 'bg-orange-50 text-orange-600 border-orange-200' : o.status === 'Confirmed' ? 'bg-blue-50 text-blue-600 border-blue-200' : o.status === 'Shipped' ? 'bg-purple-50 text-purple-600 border-purple-200' : 'bg-green-50 text-green-600 border-green-200'}`}>
                                                 Status: {o.status}
