@@ -20,7 +20,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-        import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
         import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, updatePassword } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
         const firebaseConfig = {
@@ -37,7 +37,7 @@
         window.db = getFirestore(app);
         window.auth = getAuth(app);
         
-        window.fb = { collection, doc, setDoc, deleteDoc, onSnapshot };
+        window.fb = { collection, doc, setDoc, deleteDoc, onSnapshot, getDoc };
         window.fbAuth = { signInWithEmailAndPassword, createUserWithEmailAndPassword, updatePassword };
         
         console.log("Firebase system ready.");
@@ -124,7 +124,6 @@
                     setCustomRequests(reqs);
                 });
 
-                // Listening to current logged-in user profile changes live from DB box
                 let unsubUser = () => {};
                 if (user && user.email) {
                     const cleanEmailId = user.email.replace(/[.#$/\[\]]/g, "_");
@@ -177,25 +176,19 @@
                 await window.fb.setDoc(window.fb.doc(window.db, "orders", orderId), updated);
             };
 
-            // NEW PERMANENT PROFILE WRITER SYSTEM
             const saveUserProfileInDatabase = async (updatedData, newPassword = "") => {
                 if (!isFirebaseReady) return;
                 const cleanEmail = updatedData.email.replace(/[.#$/\[\]]/g, "_");
-                
-                // 1. Update Profile Fields in Firestore box
                 await window.fb.setDoc(window.fb.doc(window.db, "users", cleanEmail), updatedData, { merge: true });
                 
-                // 2. If client supplied a new password, change it inside Firebase Authentication system live
                 if (newPassword && window.auth.currentUser) {
                     try {
                         await window.fbAuth.updatePassword(window.auth.currentUser, newPassword);
                     } catch (err) {
-                        console.error("Password update error authentication system: ", err);
-                        alert("Password updated locally. Re-login required to update Auth system secure layer.");
+                        console.error(err);
                     }
                 }
                 setUser(updatedData);
-                alert("Profile and address information successfully updated inside database.");
             };
 
             const addCustomRequest = async (req) => {
@@ -488,7 +481,7 @@
         }
 
         // ==========================================
-        // FEATURE IMPLEMENTED: EDITABLE DYNAMIC USER PROFILE
+        // 4. FULLY FIXED PROFILE PAGE (With Verification Guard)
         // ==========================================
         function ProfilePage({ setCurrentTab }) {
             const { user, setUser, orders, saveUserProfileInDatabase } = useStore();
@@ -511,6 +504,17 @@
             if (!user) return null;
             const myOrders = orders.filter(o => o.userId === user.email);
 
+            // Security Trigger: Request current password before opening input editing boxes
+            const triggerPasswordVerification = () => {
+                const checkPass = prompt("Security Check: Enter your current password to unlock editing:");
+                if (checkPass === null) return;
+                if (checkPass === user.password) {
+                    setIsEditing(true);
+                } else {
+                    alert("Incorrect Password! Access denied.");
+                }
+            };
+
             const handleSaveProfile = async (e) => {
                 e.preventDefault();
                 const updatedPayload = { ...user, ...profileForm };
@@ -518,63 +522,59 @@
                 setIsEditing(false);
             };
 
-            const getStatusBadge = (status) => {
-                if(status === 'Pending') return <span className="text-orange-600 bg-orange-50 px-2 py-0.5 rounded font-bold">⏳ Processing</span>;
-                if(status === 'Confirmed') return <span className="text-blue-600 bg-blue-50 px-2 py-0.5 rounded font-bold">👍 Confirmed</span>;
-                if(status === 'Shipped') return <span className="text-purple-600 bg-purple-50 px-2 py-0.5 rounded font-bold">🚚 On The Way</span>;
-                if(status === 'Delivered') return <span className="text-green-600 bg-green-50 px-2 py-0.5 rounded font-bold">✅ Delivered</span>;
-                if(status === 'Cancelled') return <span className="text-red-600 bg-red-50 px-2 py-0.5 rounded font-bold">❌ Cancelled</span>;
-                return <span className="text-slate-500">{status}</span>;
-            };
-
             return (
                 <div className="max-w-4xl mx-auto px-4 py-6 pb-24">
                     <div className="flex justify-between items-center mb-8 pb-4 border-b">
-                        <h1 className="text-3xl font-bold text-slate-900">My Profile (User Box)</h1>
-                        <button onClick={() => { setUser(null); setCurrentTab('home'); }} className="text-red-600 font-medium flex items-center gap-1"><Icons.LogOut className="w-5 h-5"/> Logout</button>
+                        <h1 className="text-3xl font-bold text-slate-900">My Profile</h1>
+                        <button onClick={() => { setUser(null); setCurrentTab('home'); }} className="text-red-600 font-bold flex items-center gap-1"><Icons.LogOut className="w-5 h-5"/> Logout / Sign Out</button>
                     </div>
 
-                    {/* DYNAMIC PROFILE CARD BOX WITH LIVE SAVING */}
                     <div className="bg-white p-6 rounded-xl border border-slate-200 mb-8 shadow-sm">
                         <div className="flex justify-between items-center mb-4 border-b pb-2">
-                            <h2 className="font-bold text-lg text-slate-800">Account & Address Details</h2>
-                            <button onClick={() => setIsEditing(!isEditing)} className="text-sm bg-blue-50 text-blue-600 px-3 py-1 rounded font-bold">
-                                {isEditing ? 'Cancel Edit' : 'Edit Information'}
-                            </button>
+                            <h2 className="font-bold text-lg text-slate-800">Account Credentials & Shipping Box</h2>
+                            {!isEditing ? (
+                                <button onClick={triggerPasswordVerification} className="text-sm bg-blue-600 text-white px-4 py-1.5 rounded font-bold shadow-sm">
+                                    Edit Profile
+                                </button>
+                            ) : (
+                                <button onClick={() => setIsEditing(false)} className="text-sm bg-slate-200 text-slate-700 px-4 py-1.5 rounded font-bold">
+                                    Cancel Edit
+                                </button>
+                            )}
                         </div>
                         
                         {!isEditing ? (
-                            <div className="space-y-1.5 text-slate-700">
-                                <p><strong>Full Name:</strong> {user.name || 'Not Provided'}</p>
-                                <p><strong>Registered Email:</strong> {user.email}</p>
-                                <p><strong>Mobile Number:</strong> {user.mobile || 'Not Provided'}</p>
-                                <p><strong>Village / City Address:</strong> {user.village || 'Not Provided'}</p>
-                                <p><strong>Locality / Area:</strong> {user.locality || 'Not Provided'}</p>
-                                <p><strong>Area Pincode:</strong> {user.pincode || 'Not Provided'}</p>
-                                <p><strong>Secure Password:</strong> ••••••••</p>
+                            <div className="space-y-3 text-slate-700 font-medium">
+                                <p className="border-b pb-1"><span className="text-slate-400 text-sm">Full Name:</span> <br />{user.name || 'Not Filled'}</p>
+                                <p className="border-b pb-1"><span className="text-slate-400 text-sm">Email ID:</span> <br />{user.email}</p>
+                                <p className="border-b pb-1"><span className="text-slate-400 text-sm">Mobile Number:</span> <br />{user.mobile || 'Not Filled'}</p>
+                                <p className="border-b pb-1"><span className="text-slate-400 text-sm">City / Village Address:</span> <br />{user.village || 'Not Filled'}</p>
+                                <p className="border-b pb-1"><span className="text-slate-400 text-sm">Locality / Area / Street:</span> <br />{user.locality || 'Not Filled'}</p>
+                                <p className="border-b pb-1"><span className="text-slate-400 text-sm">Area Pincode:</span> <br />{user.pincode || 'Not Filled'}</p>
+                                <p className="border-b pb-1"><span className="text-slate-400 text-sm">Secure Password:</span> <br />•••••••• <span className="text-xs text-blue-500 ml-2">(Hidden for privacy)</span></p>
                             </div>
                         ) : (
-                            <form onSubmit={handleSaveProfile} className="space-y-3">
-                                <div><label className="text-xs font-bold text-slate-500">Full Name</label><input type="text" className="w-full p-2 border rounded text-sm" value={profileForm.name} onChange={e => setProfileForm({...profileForm, name: e.target.value})} required /></div>
-                                <div><label className="text-xs font-bold text-slate-500">Mobile Number</label><input type="tel" className="w-full p-2 border rounded text-sm" value={profileForm.mobile} onChange={e => setProfileForm({...profileForm, mobile: e.target.value})} required /></div>
-                                <div><label className="text-xs font-bold text-slate-500">Village / City</label><input type="text" className="w-full p-2 border rounded text-sm" value={profileForm.village} onChange={e => setProfileForm({...profileForm, village: e.target.value})} required /></div>
-                                <div><label className="text-xs font-bold text-slate-500">Locality / Area</label><input type="text" className="w-full p-2 border rounded text-sm" value={profileForm.locality} onChange={e => setProfileForm({...profileForm, locality: e.target.value})} required /></div>
-                                <div><label className="text-xs font-bold text-slate-500">Pincode</label><input type="number" className="w-full p-2 border rounded text-sm" value={profileForm.pincode} onChange={e => setProfileForm({...profileForm, pincode: e.target.value})} required /></div>
-                                <div><label className="text-xs font-bold text-slate-500">Change Password</label><input type="text" className="w-full p-2 border rounded text-sm" value={profileForm.password} onChange={e => setProfileForm({...profileForm, password: e.target.value})} required /></div>
-                                <button type="submit" className="bg-green-600 text-white font-bold text-sm px-4 py-2 rounded-lg shadow mt-2">Save Profile Changes</button>
+                            <form onSubmit={handleSaveProfile} className="space-y-4">
+                                <div><label className="text-xs font-bold text-slate-500">Full Name</label><input type="text" className="w-full p-2 border rounded" value={profileForm.name} onChange={e => setProfileForm({...profileForm, name: e.target.value})} required /></div>
+                                <div><label className="text-xs font-bold text-slate-500">Mobile Number</label><input type="tel" className="w-full p-2 border rounded" value={profileForm.mobile} onChange={e => setProfileForm({...profileForm, mobile: e.target.value})} required /></div>
+                                <div><label className="text-xs font-bold text-slate-500">Village / City</label><input type="text" className="w-full p-2 border rounded" value={profileForm.village} onChange={e => setProfileForm({...profileForm, village: e.target.value})} required /></div>
+                                <div><label className="text-xs font-bold text-slate-500">Locality / Street</label><input type="text" className="w-full p-2 border rounded" value={profileForm.locality} onChange={e => setProfileForm({...profileForm, locality: e.target.value})} required /></div>
+                                <div><label className="text-xs font-bold text-slate-500">Pincode</label><input type="number" className="w-full p-2 border rounded" value={profileForm.pincode} onChange={e => setProfileForm({...profileForm, pincode: e.target.value})} required /></div>
+                                <div><label className="text-xs font-bold text-slate-500">Change Password String</label><input type="text" className="w-full p-2 border rounded" value={profileForm.password} onChange={e => setProfileForm({...profileForm, password: e.target.value})} required /></div>
+                                <button type="submit" className="bg-green-600 text-white font-bold text-sm px-6 py-2 rounded-lg shadow">Save Profile Info inside Box</button>
                             </form>
                         )}
                     </div>
                     
-                    <h2 className="font-bold text-xl mb-4">Order Box History (Permanent Records)</h2>
-                    {myOrders.length === 0 ? <p className="text-slate-500">No orders found inside your history box.</p> : (
+                    <h2 className="font-bold text-xl mb-4">My Orders History (Permanent Box)</h2>
+                    {myOrders.length === 0 ? <p className="text-slate-500">No orders found inside your permanent box.</p> : (
                         <div className="space-y-4">
                             {myOrders.map(o => (
                                 <div key={o.id} className="bg-white p-4 rounded-xl border shadow-sm">
                                     <div className="flex justify-between font-bold border-b pb-2 mb-2"><span>ID: {o.id}</span><span>{o.date}</span></div>
-                                    <div className="mb-2 text-sm">{getStatusBadge(o.status)}</div>
+                                    <div className="mb-2 text-sm font-bold">Status: {o.status}</div>
                                     {o.items.map((i, idx) => <div key={idx} className="flex justify-between text-sm py-0.5"><span>{i.quantity}x {i.name}</span><span>₹{(parseFloat(i.selectedSize?.price || i.price) * i.quantity).toFixed(2)}</span></div>)}
-                                    <div className="flex justify-between font-bold mt-2 pt-2 border-t"><span>Total paid</span><span>₹{(o.total || 0).toFixed(2)}</span></div>
+                                    <div className="flex justify-between font-bold mt-2 pt-2 border-t"><span>Total</span><span>₹{(o.total || 0).toFixed(2)}</span></div>
                                 </div>
                             ))}
                         </div>
@@ -665,8 +665,8 @@
                         <div className="space-y-4">
                             {orders.map(o => (
                                 <div key={o.id} className="bg-white p-5 border rounded-xl shadow-sm">
-                                    <div className="flex justify-between font-bold border-b pb-2 mb-2"><span>ID: {o.id}</span><span className="text-blue-600">₹{(o.total || 0).toFixed(2)}</span></div>
-                                    <p className="text-sm">Client: {o.address?.name || o.userId} ({o.address?.mobile || 'N/A'})</p>
+                                    <div className="flex justify-between font-bold border-b pb-2 mb-2"><span>ID: {o.id}</span><span>₹{(o.total || 0).toFixed(2)}</span></div>
+                                    <p className="text-sm">Client: {o.address?.name} ({o.address?.mobile})</p>
                                     <p className="text-xs text-slate-500">Address: {o.address?.village}, {o.address?.locality}, {o.address?.pincode}</p>
                                     <div className="mt-4 flex justify-between items-center flex-wrap gap-2">
                                         <span className={`text-xs px-2.5 py-1 rounded font-bold ${o.status === 'Cancelled' ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'}`}>Status: {o.status}</span>
@@ -699,6 +699,9 @@
             );
         }
 
+        // ==========================================
+        // 5. SIGN-IN & SIGN-UP AUTH PAGE
+        // ==========================================
         function AuthPage({ setCurrentTab }) {
             const { setUser } = useStore();
             const [isLogin, setIsLogin] = useState(true);
@@ -711,34 +714,34 @@
                 try {
                     if (isLogin) {
                         const credential = await window.fbAuth.signInWithEmailAndPassword(window.auth, formData.email, formData.password);
-                        
-                        // Fetch the account box from database
                         const cleanEmail = formData.email.replace(/[.#$/\[\]]/g, "_");
-                        window.fb.onSnapshot(window.fb.doc(window.db, "users", cleanEmail), (docSnap) => {
-                            if (docSnap.exists()) {
-                                setUser(docSnap.data());
-                            } else {
-                                setUser({ email: credential.user.email, name: formData.email.split('@')[0] });
-                            }
-                        });
+                        
+                        const docRef = window.fb.doc(window.db, "users", cleanEmail);
+                        const docSnap = await window.fb.getDoc(docRef);
+                        if (docSnap.exists()) {
+                            setUser(docSnap.data());
+                        } else {
+                            setUser({ email: credential.user.email, name: formData.email.split('@')[0], password: formData.password });
+                        }
                         setCurrentTab('home');
                     } else {
                         const credential = await window.fbAuth.createUserWithEmailAndPassword(window.auth, formData.email, formData.password);
                         const cleanEmail = formData.email.replace(/[.#$/\[\]]/g, "_");
                         
-                        // CREATING NEW PERMANENT BOX STAGE IN FIRESTORE
                         const initialUserPayload = { ...formData, uid: credential.user.uid };
                         await window.fb.setDoc(window.fb.doc(window.db, "users", cleanEmail), initialUserPayload);
                         
                         setUser(initialUserPayload);
                         setCurrentTab('home');
                     }
-                } catch (err) { setError('Authentication Failed: Make sure information is structured correctly.'); }
+                } catch (err) { 
+                    setError('Authentication Failed: Make sure data structure is valid.'); 
+                }
             };
 
             return (
                 <div className="max-w-md mx-auto mt-10 mb-24 bg-white p-8 border rounded-xl shadow-sm">
-                    <h2 className="text-2xl font-bold text-center mb-6">{isLogin ? 'Sign In' : 'Create Account (Open Box)'}</h2>
+                    <h2 className="text-2xl font-bold text-center mb-6">{isLogin ? 'Sign In / Sign Out' : 'Create Account (Open Box)'}</h2>
                     {error && <div className="mb-4 p-2 bg-red-50 text-red-600 text-center text-sm">{error}</div>}
                     <form onSubmit={handleSubmit} className="space-y-4">
                         {!isLogin && (
@@ -814,4 +817,3 @@
     </script>
 </body>
 </html>
-pool
