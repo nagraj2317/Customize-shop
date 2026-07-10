@@ -14,6 +14,10 @@
         body { font-family: system-ui, -apple-system, sans-serif; background-color: #f8fafc; color: #0f172a; margin: 0; }
         .pb-safe { padding-bottom: env(safe-area-inset-bottom, 4rem); }
         .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        
+        /* સ્લાઇડરમાંથી સ્ક્રોલબાર છુપાવવા માટે */
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
 </head>
 <body>
@@ -52,7 +56,19 @@
         function AppProvider({ children }) {
             const [user, setUser] = useState(null);
             const [invitedAdmins, setInvitedAdmins] = useState(['sachin2317u@gmail.com']); 
-            const [products, setProducts] = useState([]); 
+            
+            // ડેમો ડેટા જેથી ખાલી સ્ક્રીન ન દેખાય 
+            const [products, setProducts] = useState([
+                {
+                    id: 'p1', name: '3D Printed Vase', category: 'Decor', price: 499, description: 'ખૂબ જ સુંદર 3D પ્રિન્ટેડ ફ્લાવર વાઝ. તમારા ઘરને સજાવવા માટે ઉત્તમ.',
+                    images: ['https://via.placeholder.com/400/333333/FFFFFF?text=Photo+1', 'https://via.placeholder.com/400/555555/FFFFFF?text=Photo+2', 'https://via.placeholder.com/400/777777/FFFFFF?text=Photo+3'],
+                    sizes: [{name: 'Small', price: 499}, {name: 'Large', price: 899}]
+                },
+                {
+                    id: 'p2', name: 'Custom Name Stand', category: 'Gifts', price: 299, description: 'તમારું નામ 3D માં પ્રિન્ટ કરાવો. ઓફિસ ડેસ્ક માટે શ્રેષ્ઠ.',
+                    images: ['https://via.placeholder.com/400/0000FF/FFFFFF?text=Stand+1', 'https://via.placeholder.com/400/0055FF/FFFFFF?text=Stand+2']
+                }
+            ]); 
             const [cart, setCart] = useState([]);
             const [orders, setOrders] = useState([]);
             const [customRequests, setCustomRequests] = useState([]);
@@ -84,7 +100,7 @@
         // 3. COMPONENTS
         // ==========================================
 
-        function HomePage({ setCurrentTab }) {
+        function HomePage({ setCurrentTab, setSelectedProduct }) {
             const { products, addToCart } = useStore();
             return (
                 <div className="max-w-7xl mx-auto px-4 py-6 pb-24">
@@ -94,34 +110,38 @@
                             <p className="text-slate-500 mt-1">Discover unique creations</p>
                         </div>
                     </div>
+                    {/* અહી 2 કોલમ સેટ કરેલી છે (grid-cols-2) */}
                     <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
                         {products.length === 0 ? (
                             <div className="col-span-full text-center py-20 bg-white rounded-xl border border-slate-200 text-slate-500">
                                 હાલમાં કોઈ પ્રોડક્ટ ઉપલબ્ધ નથી.
                             </div>
                         ) : (
-                            products.map(product => <ProductCard key={product.id} product={product} addToCart={addToCart} />)
+                            products.map(product => <ProductCard key={product.id} product={product} addToCart={addToCart} setCurrentTab={setCurrentTab} setSelectedProduct={setSelectedProduct} />)
                         )}
                     </div>
                 </div>
             );
         }
 
-        // Product Card with Dropdown for sizes
-        function ProductCard({ product, addToCart }) {
+        // Product Card (અહી ટચ કરવાથી નવું પેજ ખુલશે)
+        function ProductCard({ product, addToCart, setCurrentTab, setSelectedProduct }) {
             const [selectedSizeIndex, setSelectedSizeIndex] = useState(0);
             
-            // જો સાઈઝ નાખી હોય તો તે બતાવો, નહીંતર ડીફોલ્ટ કિંમત
             const hasSizes = product.sizes && product.sizes.length > 0;
             const currentSize = hasSizes ? product.sizes[selectedSizeIndex] : { name: 'Standard', price: product.price || 0 };
             const currentPrice = currentSize.price;
-            
-            // મલ્ટીપલ ફોટામાંથી પહેલો ફોટો
             const mainImage = product.images && product.images.length > 0 ? product.images[0] : (product.imageUrl || 'https://via.placeholder.com/300');
+
+            const handleProductClick = () => {
+                setSelectedProduct(product);
+                setCurrentTab('details');
+            };
 
             return (
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden group flex flex-col">
-                    <div className="aspect-square bg-slate-100 overflow-hidden relative">
+                    {/* ફોટા પર ક્લિક ઇવેન્ટ ઉમેરી */}
+                    <div onClick={handleProductClick} className="cursor-pointer aspect-square bg-slate-100 overflow-hidden relative">
                         <img src={mainImage} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                         {product.images && product.images.length > 1 && (
                             <div className="absolute bottom-1 right-1 bg-black/60 text-white text-[10px] px-2 py-1 rounded">+{product.images.length - 1} Photos</div>
@@ -129,7 +149,8 @@
                     </div>
                     <div className="p-3 sm:p-5 flex-1 flex flex-col">
                         <span className="text-[10px] sm:text-xs font-semibold text-blue-600 uppercase tracking-wider mb-1">{product.category}</span>
-                        <h3 className="font-bold text-sm sm:text-lg text-slate-900 mb-1 line-clamp-1">{product.name}</h3>
+                        {/* નામ પર ક્લિક ઇવેન્ટ ઉમેરી */}
+                        <h3 onClick={handleProductClick} className="cursor-pointer font-bold text-sm sm:text-lg text-slate-900 mb-1 line-clamp-1 hover:text-blue-600">{product.name}</h3>
                         
                         {hasSizes && (
                             <div className="mt-2 mb-3">
@@ -150,6 +171,97 @@
                             <button onClick={() => addToCart(product, currentSize)} className="bg-slate-900 text-white p-2 rounded-lg hover:bg-slate-800 transition-colors flex items-center gap-2">
                                 <Icons.ShoppingCart className="w-4 h-4 sm:w-5 sm:h-5" />
                             </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // ==========================================
+        // નવું: PRODUCT DETAILS PAGE (તમારી જરૂરિયાત મુજબ)
+        // ==========================================
+        function ProductDetailsPage({ product, setCurrentTab }) {
+            const { addToCart } = useStore();
+            const [selectedSizeIndex, setSelectedSizeIndex] = useState(0);
+
+            if (!product) {
+                setCurrentTab('home');
+                return null;
+            }
+
+            const hasSizes = product.sizes && product.sizes.length > 0;
+            const currentSize = hasSizes ? product.sizes[selectedSizeIndex] : { name: 'Standard', price: product.price || 0 };
+            const currentPrice = currentSize.price;
+            
+            // જો ૬-૭ ફોટા હોય તો બતાવો, નહીંતર ૧ બતાવો
+            const images = product.images && product.images.length > 0 ? product.images : [product.imageUrl || 'https://via.placeholder.com/300'];
+
+            // ગયા મહિનાની ખરીદી માટે રેન્ડમ આંકડો (તમે ભવિષ્યમાં ડેટાબેઝમાંથી લાવી શકો)
+            const fakeSales = Math.floor(Math.random() * (150 - 20 + 1)) + 20;
+
+            return (
+                <div className="max-w-4xl mx-auto bg-white min-h-screen pb-24 border-x border-slate-100 shadow-sm">
+                    {/* પાછા જવા માટે બટન */}
+                    <div className="p-4 border-b flex items-center gap-3 sticky top-0 bg-white z-10 shadow-sm">
+                        <button onClick={() => setCurrentTab('home')} className="text-slate-600 p-2 bg-slate-100 rounded-full hover:bg-slate-200">
+                            <Icons.ArrowLeft className="w-5 h-5" />
+                        </button>
+                        <h1 className="text-lg font-bold line-clamp-1">{product.name}</h1>
+                    </div>
+
+                    <div className="p-4 sm:p-6">
+                        {/* ૧. પ્રોડક્ટનું નામ */}
+                        <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mb-2">{product.name}</h2>
+                        
+                        {/* ૨. છેલ્લા મહિનાની ખરીદી */}
+                        <p className="text-sm sm:text-base font-bold text-green-600 mb-6 flex items-center gap-2 bg-green-50 p-2 rounded-lg w-max">
+                            🔥 ગયા મહિને {fakeSales} લોકોએ આ પ્રોડક્ટ ખરીદી
+                        </p>
+
+                        {/* ૩. વચમાં ફોટા (સ્વાઇપ/સ્લાઇડર) */}
+                        <div className="flex overflow-x-auto gap-4 snap-x snap-mandatory pb-4 hide-scrollbar">
+                            {images.map((img, idx) => (
+                                <img 
+                                    key={idx} 
+                                    src={img} 
+                                    alt={`Slide ${idx}`} 
+                                    className="w-[85%] sm:w-[400px] h-[300px] sm:h-[400px] object-cover rounded-xl snap-center flex-shrink-0 border border-slate-200 shadow-sm" 
+                                />
+                            ))}
+                        </div>
+                        <p className="text-xs text-slate-400 text-center mt-1 mb-6">(બાજુમાં સ્વાઇપ કરીને બધા ફોટા જુઓ)</p>
+
+                        {/* ૪. પ્રોડક્ટની માહિતી અને ખરીદીનું બટન */}
+                        <div className="mt-4">
+                            <h3 className="font-bold text-lg border-b pb-2 mb-3">પ્રોડક્ટની માહિતી</h3>
+                            <p className="text-slate-600 text-base leading-relaxed mb-6">{product.description || 'આ પ્રોડક્ટ માટે કોઈ વધારાની માહિતી ઉપલબ્ધ નથી.'}</p>
+                        </div>
+
+                        {/* સાઇઝ અને કાર્ટ બટનનું બોક્સ */}
+                        <div className="mt-6 p-5 bg-slate-50 rounded-xl border border-slate-200 shadow-inner">
+                            {hasSizes && (
+                                <div className="mb-4">
+                                    <label className="block text-sm font-bold text-slate-700 mb-2">સાઇઝ પસંદ કરો:</label>
+                                    <select 
+                                        className="w-full sm:w-1/2 border border-slate-300 rounded-lg p-3 bg-white outline-none font-medium"
+                                        value={selectedSizeIndex}
+                                        onChange={(e) => setSelectedSizeIndex(e.target.value)}
+                                    >
+                                        {product.sizes.map((s, i) => (
+                                            <option key={i} value={i}>{s.name} - ₹{s.price}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
+                            <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-200">
+                                <div>
+                                    <p className="text-sm text-slate-500">કુલ કિંમત</p>
+                                    <span className="text-3xl font-black text-slate-900">₹{parseFloat(currentPrice).toFixed(2)}</span>
+                                </div>
+                                <button onClick={() => { addToCart(product, currentSize); alert('કાર્ટમાં ઉમેરાઈ ગયું!'); }} className="bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 font-bold flex items-center gap-2 shadow-lg">
+                                    <Icons.ShoppingCart className="w-5 h-5" /> Add to Cart
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -283,7 +395,7 @@
         }
 
         // ==========================================
-        // ADMIN PANEL (સુધારેલ: ડાયનેમિક સાઇઝ બોક્સ અને મલ્ટીપલ ફોટા)
+        // ADMIN PANEL
         // ==========================================
         function AdminPage({ setCurrentTab }) {
             const { user, products, setProducts, orders, invitedAdmins, setInvitedAdmins } = useStore();
@@ -298,19 +410,15 @@
 
             const handleDelete = (id) => setProducts(products.filter(p => p.id !== id));
             
-            // ડ્રોપડાઉનમાંથી અંક બદલાય ત્યારે બોક્સ જનરેટ કરવા માટે
             const handleSizeCountChange = (e) => {
                 const count = parseInt(e.target.value, 10);
                 setSizeCount(count);
-                
                 setSizes(prev => {
                     const newSizes = [...prev];
                     if (count > newSizes.length) {
-                        for (let i = newSizes.length; i < count; i++) {
-                            newSizes.push({ name: '', price: '' }); // નવા ખાલી બોક્સ ઉમેરો
-                        }
+                        for (let i = newSizes.length; i < count; i++) newSizes.push({ name: '', price: '' });
                     } else if (count < newSizes.length) {
-                        newSizes.length = count; // વધારાના બોક્સ કાઢી નાખો
+                        newSizes.length = count; 
                     }
                     return newSizes;
                 });
@@ -324,7 +432,6 @@
                 });
             };
 
-            // એકથી વધુ ફોટા અપલોડ કરવા માટે
             const handleImageUpload = (e) => {
                 const files = Array.from(e.target.files);
                 if (files.length > 0) {
@@ -352,14 +459,8 @@
 
             const handleSave = (e) => {
                 e.preventDefault();
-                // સાઇઝની કિંમત નંબર માં કન્વર્ટ કરો
                 const formattedSizes = sizes.map(s => ({ name: s.name, price: parseFloat(s.price) || 0 }));
-                
-                const payload = { 
-                    ...formData, 
-                    sizes: formattedSizes, 
-                    price: formattedSizes[0]?.price || 0 
-                };
+                const payload = { ...formData, sizes: formattedSizes, price: formattedSizes[0]?.price || 0 };
                 
                 if (formData.id) setProducts(products.map(p => p.id === formData.id ? payload : p));
                 else setProducts([{ ...payload, id: 'p' + Date.now() }, ...products]);
@@ -440,19 +541,15 @@
 
                             {(view === 'add' || view === 'edit') && (
                                 <form onSubmit={handleSave} className="bg-white p-6 rounded-xl border border-slate-200 space-y-6">
-                                    
                                     <div className="space-y-4">
                                         <h3 className="font-bold text-lg border-b pb-2">Basic Details</h3>
                                         <input type="text" placeholder="Product Name" required className="w-full p-2 border rounded" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
                                         <input type="text" placeholder="Category" required className="w-full p-2 border rounded" value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})} />
                                         <textarea placeholder="Description" required className="w-full p-2 border rounded" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} />
                                     </div>
-
-                                    {/* મલ્ટીપલ ફોટા એડ કરવાની સિસ્ટમ */}
                                     <div className="space-y-4">
                                         <h3 className="font-bold text-lg border-b pb-2">Upload Photos (Select Multiple)</h3>
                                         <input type="file" multiple accept="image/*" onChange={handleImageUpload} className="w-full border p-2 bg-slate-50 rounded" />
-                                        
                                         {formData.images.length > 0 && (
                                             <div className="flex flex-wrap gap-2 mt-2">
                                                 {formData.images.map((imgBase64, idx) => (
@@ -464,19 +561,14 @@
                                             </div>
                                         )}
                                     </div>
-
-                                    {/* ડાયનેમિક સાઇઝ સિસ્ટમ */}
                                     <div className="space-y-4">
                                         <h3 className="font-bold text-lg border-b pb-2">Size & Pricing</h3>
                                         <div>
                                             <label className="text-sm font-bold text-slate-700 block mb-1">આ પ્રોડક્ટમાં કેટલી સાઇઝના ઓપ્શન આપવા છે?</label>
                                             <select value={sizeCount} onChange={handleSizeCountChange} className="w-full sm:w-1/3 border p-2 rounded bg-white">
-                                                {[...Array(10)].map((_, i) => (
-                                                    <option key={i+1} value={i+1}>{i+1} સાઇઝ</option>
-                                                ))}
+                                                {[...Array(10)].map((_, i) => <option key={i+1} value={i+1}>{i+1} સાઇઝ</option>)}
                                             </select>
                                         </div>
-
                                         <div className="space-y-3 mt-4">
                                             {sizes.map((size, idx) => (
                                                 <div key={idx} className="flex gap-4 items-center bg-slate-50 p-3 rounded border">
@@ -491,13 +583,11 @@
                                             ))}
                                         </div>
                                     </div>
-
                                     <button type="submit" className="w-full bg-slate-900 text-white p-3 rounded font-bold text-lg hover:bg-slate-800">Save Product</button>
                                 </form>
                             )}
                         </div>
                     )}
-
                     {adminTab === 'orders' && (
                         <div className="space-y-4">
                             {orders.length === 0 ? <p className="text-slate-500 bg-white p-6 border rounded-xl">હજુ કોઈ ઓર્ડર મળ્યા નથી.</p> : (
@@ -597,11 +687,17 @@
             );
         }
 
+        // ==========================================
+        // MAIN APP COMPONENT
+        // ==========================================
         function App() {
             const { user, cart, invitedAdmins } = useStore();
             const [currentTab, setCurrentTab] = useState('home');
-            const cartItemsCount = cart.reduce((acc, item) => acc + item.quantity, 0);
             
+            // નવું: કઈ પ્રોડક્ટ પર ક્લિક કર્યું છે તે યાદ રાખવા માટેનું સ્ટેટ
+            const [selectedProduct, setSelectedProduct] = useState(null); 
+            
+            const cartItemsCount = cart.reduce((acc, item) => acc + item.quantity, 0);
             const isAdmin = user && invitedAdmins.includes(user.email);
 
             const navItems = [
@@ -623,7 +719,12 @@
                     </header>
                     
                     <main>
-                        {currentTab === 'home' && <HomePage setCurrentTab={setCurrentTab} />}
+                        {/* મેં અહીં setSelectedProduct પાસ કર્યું છે જેથી હોમ પેજ પરથી ક્લિક કરી શકાય */}
+                        {currentTab === 'home' && <HomePage setCurrentTab={setCurrentTab} setSelectedProduct={setSelectedProduct} />}
+                        
+                        {/* અહીં આપણું નવું ડિટેલ્સ પેજ ખુલશે */}
+                        {currentTab === 'details' && <ProductDetailsPage product={selectedProduct} setCurrentTab={setCurrentTab} />}
+                        
                         {currentTab === 'cart' && <CartPage setCurrentTab={setCurrentTab} />}
                         {currentTab === 'custom' && <CustomRequestPage setCurrentTab={setCurrentTab} />}
                         {currentTab === 'profile' && <ProfilePage setCurrentTab={setCurrentTab} />}
@@ -634,7 +735,7 @@
                     <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 pb-safe z-50">
                         <div className="flex justify-around items-center h-16 max-w-md mx-auto">
                             {navItems.map(item => (
-                                <button key={item.id} onClick={() => { if ((item.id === 'profile' || item.id === 'custom') && !user) setCurrentTab('auth'); else setCurrentTab(item.id); }} className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${currentTab === item.id ? 'text-blue-600' : 'text-slate-500'}`}>
+                                <button key={item.id} onClick={() => { if ((item.id === 'profile' || item.id === 'custom') && !user) setCurrentTab('auth'); else setCurrentTab(item.id); }} className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${currentTab === item.id || (item.id === 'home' && currentTab === 'details') ? 'text-blue-600' : 'text-slate-500'}`}>
                                     <div className="relative">
                                         <item.icon className="w-6 h-6" />
                                         {item.badge > 0 && <span className="absolute -top-1 -right-2 bg-blue-600 text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center font-bold">{item.badge}</span>}
