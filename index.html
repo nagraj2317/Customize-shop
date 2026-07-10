@@ -47,53 +47,81 @@
         };
 
         // ==========================================
-        // 2. STATE MANAGEMENT (With LocalStorage Fix)
+        // 2. STATE MANAGEMENT (Fully Firebase Powered)
         // ==========================================
         const AppContext = createContext(undefined);
 
         function AppProvider({ children }) {
-            // યુઝર ડેટા લોકલ સ્ટોરેજમાંથી લાવવા
             const [user, setUser] = useState(() => {
                 const saved = localStorage.getItem('app_user');
                 return saved ? JSON.parse(saved) : null;
             });
             const [invitedAdmins, setInvitedAdmins] = useState(['sachin2317u@gmail.com']); 
             
-            // પ્રોડક્ટ્સ લોકલ સ્ટોરેજમાંથી લાવવા (સેવ કરેલી પ્રોડક્ટ ક્યારેય ઉડશે નહીં)
-            const [products, setProducts] = useState(() => {
-                const saved = localStorage.getItem('app_products');
-                return saved ? JSON.parse(saved) : [];
-            }); 
-
+            // State for Firebase Data
+            const [products, setProducts] = useState([]); 
+            const [orders, setOrders] = useState([]);
+            
             const [cart, setCart] = useState(() => {
                 const saved = localStorage.getItem('app_cart');
                 return saved ? JSON.parse(saved) : [];
             });
 
-            const [orders, setOrders] = useState(() => {
-                const saved = localStorage.getItem('app_orders');
-                return saved ? JSON.parse(saved) : [];
-            });
-
-            const [customRequests, setCustomRequests] = useState([]);
-
-            // જ્યારે પણ ડેટા બદલાય ત્યારે ઓટોમેટિક બ્રાઉઝરમાં સેવ થઈ જશે!
+            // Keep local user and cart persisted across refresh
             useEffect(() => { 
                 if(user) localStorage.setItem('app_user', JSON.stringify(user)); 
                 else localStorage.removeItem('app_user'); 
             }, [user]);
-
-            useEffect(() => { 
-                try {
-                    localStorage.setItem('app_products', JSON.stringify(products)); 
-                } catch(e) {
-                    alert("Storage Limit Reached! The uploaded photos might be too large. Please upload smaller images.");
-                }
-            }, [products]);
-
             useEffect(() => { localStorage.setItem('app_cart', JSON.stringify(cart)); }, [cart]);
-            useEffect(() => { localStorage.setItem('app_orders', JSON.stringify(orders)); }, [orders]);
 
+            // FIREBASE REAL-TIME SYNC
+            useEffect(() => {
+                if (!window.db || !window.fb) return;
+
+                // Listen to Products Collection
+                const unsubProducts = window.fb.onSnapshot(window.fb.collection(window.db, "products"), (snapshot) => {
+                    const prods = [];
+                    snapshot.forEach(doc => prods.push(doc.data()));
+                    setProducts(prods);
+                });
+
+                // Listen to Orders Collection
+                const unsubOrders = window.fb.onSnapshot(window.fb.collection(window.db, "orders"), (snapshot) => {
+                    const ords = [];
+                    snapshot.forEach(doc => ords.push(doc.data()));
+                    ords.sort((a, b) => b.id.localeCompare(a.id)); // Newest first
+                    setOrders(ords);
+                });
+
+                return () => {
+                    unsubProducts();
+                    unsubOrders();
+                };
+            }, []);
+
+            // FIREBASE FUNCTIONS (Replaces standard setProducts / setOrders)
+            const addOrUpdateProduct = async (prod) => {
+                await window.fb.setDoc(window.fb.doc(window.db, "products", prod.id), prod);
+            };
+            const deleteProduct = async (id) => {
+                await window.fb.deleteDoc(window.fb.doc(window.db, "products", id));
+            };
+
+            const addOrder = async (order) => {
+                await window.fb.setDoc(window.fb.doc(window.db, "orders", order.id), order);
+            };
+            const updateOrderStatus = async (orderId, newStatus) => {
+                const order = orders.find(o => o.id === orderId);
+                if (order) {
+                    const updated = { ...order, status: newStatus };
+                    await window.fb.setDoc(window.fb.doc(window.db, "orders", orderId), updated);
+                }
+            };
+            const deleteOrder = async (orderId) => {
+                await window.fb.deleteDoc(window.fb.doc(window.db, "orders", orderId));
+            };
+
+            // CART FUNCTIONS
             const addToCart = (product, selectedSize) => {
                 setCart(prev => {
                     const existing = prev.find(item => item.id === product.id && item.selectedSize?.name === selectedSize?.name);
@@ -104,16 +132,13 @@
             const removeFromCart = (index) => setCart(prev => prev.filter((_, i) => i !== index));
             const updateQuantity = (index, quantity) => setCart(prev => prev.map((item, i) => i === index ? { ...item, quantity } : item));
             const clearCart = () => setCart([]);
-            
-            const updateOrderStatus = (orderId, newStatus) => {
-                setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
-            };
 
             return (
                 <AppContext.Provider value={{ 
                     user, setUser, invitedAdmins, setInvitedAdmins,
-                    products, setProducts, cart, addToCart, removeFromCart, updateQuantity, clearCart,
-                    orders, setOrders, updateOrderStatus, customRequests, setCustomRequests
+                    products, addOrUpdateProduct, deleteProduct, 
+                    cart, addToCart, removeFromCart, updateQuantity, clearCart,
+                    orders, addOrder, updateOrderStatus, deleteOrder
                 }}>
                     {children}
                 </AppContext.Provider>
@@ -262,7 +287,7 @@
         }
 
         function CartPage({ setCurrentTab }) {
-            const { cart, removeFromCart, updateQuantity, clearCart, user, setOrders } = useStore();
+            const { cart, removeFromCart, updateQuantity, clearCart, user, addOrder } = useStore();
             const [isCheckingOut, setIsCheckingOut] = useState(false);
             const [success, setSuccess] = useState(false);
             
@@ -272,27 +297,33 @@
                 if (!user) { setCurrentTab('auth'); return; }
                 if (cart.length === 0) return;
                 setIsCheckingOut(true);
-                setTimeout(() => {
-                    setOrders(prev => [{ 
-                        id: 'ORD-' + Date.now(), 
-                        userId: user.email, 
-                        address: user, 
-                        items: [...cart], 
-                        total, 
-                        date: new Date().toLocaleDateString(),
-                        status: 'Pending'
-                    }, ...prev]);
+                
+                const newOrder = { 
+                    id: 'ORD-' + Date.now(), 
+                    userId: user.email, 
+                    address: user, 
+                    items: [...cart], 
+                    total, 
+                    date: new Date().toLocaleDateString(),
+                    status: 'Pending'
+                };
+
+                // Firebase માં ઓર્ડર સેવ કરે છે
+                addOrder(newOrder).then(() => {
                     clearCart();
                     setSuccess(true);
-                    setTimeout(() => setCurrentTab('profile'), 2000);
-                }, 1500);
+                    setTimeout(() => {
+                        setIsCheckingOut(false);
+                        setCurrentTab('profile');
+                    }, 2000);
+                });
             };
 
             if (success) return (
                 <div className="max-w-md mx-auto mt-20 p-8 bg-white rounded-xl shadow-sm border border-green-200 text-center">
                     <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4"><Icons.CreditCard className="w-8 h-8" /></div>
                     <h2 className="text-2xl font-bold text-slate-900 mb-2">Payment Successful!</h2>
-                    <p className="text-slate-600">Your order has been placed.</p>
+                    <p className="text-slate-600">Your order has been placed securely.</p>
                 </div>
             );
 
@@ -409,7 +440,7 @@
                                     <div className="mb-3 font-bold text-sm bg-slate-50 p-2 rounded">
                                         Status: {getStatusMessage(o.status)}
                                     </div>
-                                    {o.items.map(i => <div key={i.id} className="flex justify-between text-sm py-1"><span>{i.quantity}x {i.name} ({i.selectedSize?.name})</span><span>₹{(parseFloat(i.selectedSize?.price || i.price) * i.quantity).toFixed(2)}</span></div>)}
+                                    {o.items.map((i, idx) => <div key={idx} className="flex justify-between text-sm py-1"><span>{i.quantity}x {i.name} ({i.selectedSize?.name})</span><span>₹{(parseFloat(i.selectedSize?.price || i.price) * i.quantity).toFixed(2)}</span></div>)}
                                     <div className="flex justify-between font-bold mt-3 pt-2 border-t"><span>Total</span><span>₹{o.total.toFixed(2)}</span></div>
                                 </div>
                             ))}
@@ -420,10 +451,10 @@
         }
 
         // ==========================================
-        // ADMIN PANEL (Save Bug Fixed)
+        // ADMIN PANEL
         // ==========================================
         function AdminPage({ setCurrentTab }) {
-            const { user, products, setProducts, orders, updateOrderStatus, invitedAdmins, setInvitedAdmins } = useStore();
+            const { user, products, addOrUpdateProduct, deleteProduct, orders, updateOrderStatus, deleteOrder, invitedAdmins, setInvitedAdmins } = useStore();
             const [adminTab, setAdminTab] = useState('products'); 
             const [view, setView] = useState('list');
             
@@ -440,8 +471,6 @@
                 );
             }
 
-            const handleDelete = (id) => setProducts(products.filter(p => p.id !== id));
-            
             const handleSizeCountChange = (e) => {
                 const count = parseInt(e.target.value, 10);
                 setSizeCount(count);
@@ -486,25 +515,18 @@
                 });
             };
 
-            // સેવ કરવા માટેનું ફંક્શન હવે સંપૂર્ણ સુરક્ષિત છે
             const handleSave = (e) => {
                 e.preventDefault();
-                try {
-                    const formattedSizes = sizes.map(s => ({ name: s.name, price: parseFloat(s.price) || 0 }));
-                    
-                    // જો સાઈઝ ખાલી હોય તો એરર ન આવે તેનું ધ્યાન રાખ્યું છે
-                    const basePrice = formattedSizes.length > 0 ? formattedSizes[0].price : 0; 
-                    const payload = { ...formData, sizes: formattedSizes, price: basePrice };
-                    
-                    if (formData.id) {
-                        setProducts(products.map(p => p.id === formData.id ? payload : p));
-                    } else {
-                        setProducts([{ ...payload, id: 'p' + Date.now() }, ...products]);
-                    }
-                    setView('list');
-                } catch (error) {
-                    alert("Error saving product: " + error.message);
+                const formattedSizes = sizes.map(s => ({ name: s.name, price: parseFloat(s.price) || 0 }));
+                const basePrice = formattedSizes.length > 0 ? formattedSizes[0].price : 0; 
+                
+                const payload = { ...formData, sizes: formattedSizes, price: basePrice };
+                if (!formData.id) {
+                    payload.id = 'p' + Date.now();
                 }
+
+                // Firebase માં સેવ કરે છે (પરમેનન્ટ સેવ)
+                addOrUpdateProduct(payload).then(() => setView('list'));
             };
 
             const resetForm = () => {
@@ -537,6 +559,7 @@
                         <button onClick={() => setAdminTab('orders')} className={`px-4 py-2 font-bold rounded-lg ${adminTab === 'orders' ? 'bg-slate-900 text-white' : 'bg-slate-200 text-slate-700'}`}>Customer Orders</button>
                     </div>
 
+                    {/* Products Tab */}
                     {adminTab === 'products' && (
                         <div>
                             <div className="flex justify-end mb-4">
@@ -564,7 +587,7 @@
                                                     <td className="px-6 py-4 font-medium">₹{p.price.toFixed(2)}</td>
                                                     <td className="px-6 py-4 text-right">
                                                         <button onClick={() => { setFormData(p); setSizes(p.sizes || [{name: '', price: ''}]); setSizeCount(p.sizes?.length || 1); setView('edit'); }} className="p-2 text-slate-400 hover:text-blue-600"><Icons.Edit className="w-5 h-5" /></button>
-                                                        <button onClick={() => handleDelete(p.id)} className="p-2 text-slate-400 hover:text-red-600"><Icons.Trash2 className="w-5 h-5" /></button>
+                                                        <button onClick={() => deleteProduct(p.id)} className="p-2 text-slate-400 hover:text-red-600"><Icons.Trash2 className="w-5 h-5" /></button>
                                                     </td>
                                                 </tr>
                                             ))}
@@ -619,6 +642,7 @@
                         </div>
                     )}
                     
+                    {/* Orders Tab */}
                     {adminTab === 'orders' && (
                         <div className="space-y-4">
                             {orders.length === 0 ? <p className="text-slate-500 bg-white p-6 border rounded-xl">No orders have been placed yet.</p> : (
@@ -671,10 +695,13 @@
                                                 Status: {o.status}
                                             </div>
                                             
-                                            <div className="flex gap-2 w-full sm:w-auto">
+                                            <div className="flex gap-2 w-full flex-wrap sm:flex-nowrap">
                                                 {o.status === 'Pending' && <button onClick={() => updateOrderStatus(o.id, 'Confirmed')} className="flex-1 sm:flex-none bg-blue-600 text-white font-bold text-sm px-4 py-2 rounded-lg shadow hover:bg-blue-700 transition">Confirm Order</button>}
                                                 {o.status === 'Confirmed' && <button onClick={() => updateOrderStatus(o.id, 'Shipped')} className="flex-1 sm:flex-none bg-purple-600 text-white font-bold text-sm px-4 py-2 rounded-lg shadow hover:bg-purple-700 transition">Pack & Ship</button>}
                                                 {o.status === 'Shipped' && <button onClick={() => updateOrderStatus(o.id, 'Delivered')} className="flex-1 sm:flex-none bg-green-600 text-white font-bold text-sm px-4 py-2 rounded-lg shadow hover:bg-green-700 transition">Mark Delivered</button>}
+                                                
+                                                {/* નવું: ઓર્ડર ડીલીટ કરવાનું બટન */}
+                                                <button onClick={() => { if(window.confirm('Are you sure you want to delete this order forever?')) deleteOrder(o.id); }} className="flex-1 sm:flex-none bg-red-100 text-red-600 font-bold text-sm px-4 py-2 rounded-lg shadow-sm hover:bg-red-200 transition">Delete Order</button>
                                             </div>
                                         </div>
 
@@ -807,8 +834,13 @@
             );
         }
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<AppProvider><App /></AppProvider>);
+        // ==========================================
+        // 4. REACT INITIALIZATION (Ensures Firebase loads first)
+        // ==========================================
+        window.initReactApp = () => {
+            const root = ReactDOM.createRoot(document.getElementById('root'));
+            root.render(<AppProvider><App /></AppProvider>);
+        };
     </script>
 
     <script type="module">
@@ -834,6 +866,9 @@
         window.fbAuth = { signInWithEmailAndPassword, createUserWithEmailAndPassword };
         
         console.log("Firebase Super-Charged & Ready!");
+        
+        // ફાઈરબેઝ કનેક્ટ થયા પછી જ React એપ ચાલુ થશે. 
+        window.initReactApp();
     </script>
     
 </body>
