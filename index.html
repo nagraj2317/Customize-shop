@@ -47,18 +47,20 @@
         };
 
         // ==========================================
-        // 2. STATE MANAGEMENT (Fully Firebase Powered)
+        // 2. STATE MANAGEMENT (Firebase + Anti-Crash Loading)
         // ==========================================
         const AppContext = createContext(undefined);
 
         function AppProvider({ children }) {
+            // Anti-Crash System: Wait for Firebase to load
+            const [isFirebaseReady, setIsFirebaseReady] = useState(false);
+
             const [user, setUser] = useState(() => {
                 const saved = localStorage.getItem('app_user');
                 return saved ? JSON.parse(saved) : null;
             });
             const [invitedAdmins, setInvitedAdmins] = useState(['sachin2317u@gmail.com']); 
             
-            // State for Firebase Data
             const [products, setProducts] = useState([]); 
             const [orders, setOrders] = useState([]);
             
@@ -67,29 +69,40 @@
                 return saved ? JSON.parse(saved) : [];
             });
 
-            // Keep local user and cart persisted across refresh
+            // Check if Firebase is loaded every 100ms
+            useEffect(() => {
+                const checkFirebase = setInterval(() => {
+                    if (window.fb && window.db && window.fbAuth && window.auth) {
+                        setIsFirebaseReady(true);
+                        clearInterval(checkFirebase);
+                    }
+                }, 100);
+                return () => clearInterval(checkFirebase);
+            }, []);
+
+            // Keep user & cart safe in LocalStorage
             useEffect(() => { 
                 if(user) localStorage.setItem('app_user', JSON.stringify(user)); 
                 else localStorage.removeItem('app_user'); 
             }, [user]);
             useEffect(() => { localStorage.setItem('app_cart', JSON.stringify(cart)); }, [cart]);
 
-            // FIREBASE REAL-TIME SYNC
+            // FIREBASE REAL-TIME SYNC (Runs only after Firebase is ready)
             useEffect(() => {
-                if (!window.db || !window.fb) return;
+                if (!isFirebaseReady) return;
 
-                // Listen to Products Collection
+                // Listen to Products
                 const unsubProducts = window.fb.onSnapshot(window.fb.collection(window.db, "products"), (snapshot) => {
                     const prods = [];
                     snapshot.forEach(doc => prods.push(doc.data()));
                     setProducts(prods);
                 });
 
-                // Listen to Orders Collection
+                // Listen to Orders
                 const unsubOrders = window.fb.onSnapshot(window.fb.collection(window.db, "orders"), (snapshot) => {
                     const ords = [];
                     snapshot.forEach(doc => ords.push(doc.data()));
-                    ords.sort((a, b) => b.id.localeCompare(a.id)); // Newest first
+                    ords.sort((a, b) => b.id.localeCompare(a.id)); 
                     setOrders(ords);
                 });
 
@@ -97,20 +110,24 @@
                     unsubProducts();
                     unsubOrders();
                 };
-            }, []);
+            }, [isFirebaseReady]);
 
-            // FIREBASE FUNCTIONS (Replaces standard setProducts / setOrders)
+            // Database Actions
             const addOrUpdateProduct = async (prod) => {
+                if (!isFirebaseReady) return;
                 await window.fb.setDoc(window.fb.doc(window.db, "products", prod.id), prod);
             };
             const deleteProduct = async (id) => {
+                if (!isFirebaseReady) return;
                 await window.fb.deleteDoc(window.fb.doc(window.db, "products", id));
             };
 
             const addOrder = async (order) => {
+                if (!isFirebaseReady) return;
                 await window.fb.setDoc(window.fb.doc(window.db, "orders", order.id), order);
             };
             const updateOrderStatus = async (orderId, newStatus) => {
+                if (!isFirebaseReady) return;
                 const order = orders.find(o => o.id === orderId);
                 if (order) {
                     const updated = { ...order, status: newStatus };
@@ -118,10 +135,10 @@
                 }
             };
             const deleteOrder = async (orderId) => {
+                if (!isFirebaseReady) return;
                 await window.fb.deleteDoc(window.fb.doc(window.db, "orders", orderId));
             };
 
-            // CART FUNCTIONS
             const addToCart = (product, selectedSize) => {
                 setCart(prev => {
                     const existing = prev.find(item => item.id === product.id && item.selectedSize?.name === selectedSize?.name);
@@ -132,6 +149,19 @@
             const removeFromCart = (index) => setCart(prev => prev.filter((_, i) => i !== index));
             const updateQuantity = (index, quantity) => setCart(prev => prev.map((item, i) => i === index ? { ...item, quantity } : item));
             const clearCart = () => setCart([]);
+
+            // લોડિંગ સ્ક્રીન - જ્યાં સુધી ડેટાબેઝ ચાલુ ન થાય
+            if (!isFirebaseReady) {
+                return (
+                    <div className="min-h-screen flex items-center justify-center bg-slate-50">
+                        <div className="text-center">
+                            <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                            <p className="text-slate-600 font-bold text-lg">Loading Store...</p>
+                            <p className="text-slate-400 text-sm mt-2">Connecting to database securely</p>
+                        </div>
+                    </div>
+                );
+            }
 
             return (
                 <AppContext.Provider value={{ 
@@ -308,7 +338,6 @@
                     status: 'Pending'
                 };
 
-                // Firebase માં ઓર્ડર સેવ કરે છે
                 addOrder(newOrder).then(() => {
                     clearCart();
                     setSuccess(true);
@@ -525,7 +554,6 @@
                     payload.id = 'p' + Date.now();
                 }
 
-                // Firebase માં સેવ કરે છે (પરમેનન્ટ સેવ)
                 addOrUpdateProduct(payload).then(() => setView('list'));
             };
 
@@ -700,7 +728,6 @@
                                                 {o.status === 'Confirmed' && <button onClick={() => updateOrderStatus(o.id, 'Shipped')} className="flex-1 sm:flex-none bg-purple-600 text-white font-bold text-sm px-4 py-2 rounded-lg shadow hover:bg-purple-700 transition">Pack & Ship</button>}
                                                 {o.status === 'Shipped' && <button onClick={() => updateOrderStatus(o.id, 'Delivered')} className="flex-1 sm:flex-none bg-green-600 text-white font-bold text-sm px-4 py-2 rounded-lg shadow hover:bg-green-700 transition">Mark Delivered</button>}
                                                 
-                                                {/* નવું: ઓર્ડર ડીલીટ કરવાનું બટન */}
                                                 <button onClick={() => { if(window.confirm('Are you sure you want to delete this order forever?')) deleteOrder(o.id); }} className="flex-1 sm:flex-none bg-red-100 text-red-600 font-bold text-sm px-4 py-2 rounded-lg shadow-sm hover:bg-red-200 transition">Delete Order</button>
                                             </div>
                                         </div>
@@ -834,13 +861,8 @@
             );
         }
 
-        // ==========================================
-        // 4. REACT INITIALIZATION (Ensures Firebase loads first)
-        // ==========================================
-        window.initReactApp = () => {
-            const root = ReactDOM.createRoot(document.getElementById('root'));
-            root.render(<AppProvider><App /></AppProvider>);
-        };
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<AppProvider><App /></AppProvider>);
     </script>
 
     <script type="module">
@@ -866,9 +888,6 @@
         window.fbAuth = { signInWithEmailAndPassword, createUserWithEmailAndPassword };
         
         console.log("Firebase Super-Charged & Ready!");
-        
-        // ફાઈરબેઝ કનેક્ટ થયા પછી જ React એપ ચાલુ થશે. 
-        window.initReactApp();
     </script>
     
 </body>
