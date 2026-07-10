@@ -40,7 +40,7 @@
         window.fb = { collection, doc, setDoc, deleteDoc, onSnapshot, getDoc };
         window.fbAuth = { signInWithEmailAndPassword, createUserWithEmailAndPassword, updatePassword };
         
-        console.log("Firebase system ready.");
+        console.log("Firebase system ready with Dynamic Admin Selection Layer.");
     </script>
 </head>
 <body>
@@ -204,8 +204,11 @@
                 setCart(prev => {
                     const existing = prev.find(item => item.id === product.id && item.selectedSize?.name === selectedSize?.name);
                     if (existing) return prev.map(item => item === existing ? { ...item, quantity: item.quantity + 1 } : item);
-                    return [...prev, { ...product, selectedSize, quantity: 1 }];
+                    return [...prev, { ...product, selectedSize, quantity: 1, referenceFile: '', fileToCustomer: product.fileToCustomer || false }];
                 });
+            };
+            const updateCartItemFile = (index, fileBase64) => {
+                setCart(prev => prev.map((item, i) => i === index ? { ...item, referenceFile: fileBase64 } : item));
             };
             const removeFromCart = (index) => setCart(prev => prev.filter((_, i) => i !== index));
             const updateQuantity = (index, quantity) => setCart(prev => prev.map((item, i) => i === index ? { ...item, quantity } : item));
@@ -226,7 +229,7 @@
                 <AppContext.Provider value={{ 
                     user, setUser, invitedAdmins, setInvitedAdmins,
                     products, addOrUpdateProduct, deleteProduct, 
-                    cart, addToCart, removeFromCart, updateQuantity, clearCart,
+                    cart, addToCart, removeFromCart, updateQuantity, clearCart, updateCartItemFile,
                     orders, addOrder, updateOrderStatus, cancelOrderPermanently,
                     customRequests, addCustomRequest, deleteCustomRequest, saveUserProfileInDatabase
                 }}>
@@ -245,7 +248,7 @@
                 <div className="max-w-7xl mx-auto px-4 py-6 pb-24">
                     <div className="mb-8">
                         <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Customize shop</h1>
-                        <p className="text-slate-500 mt-1">Discover unique creations</p>
+                        <p className="text-slate-500 mt-1">Discover unique 3D creations</p>
                     </div>
                     <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
                         {products.length === 0 ? (
@@ -270,6 +273,9 @@
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden group flex flex-col">
                     <div onClick={() => { setSelectedProduct(product); setCurrentTab('details'); }} className="cursor-pointer aspect-square bg-slate-100 overflow-hidden relative">
                         <img src={mainImage} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                        {product.fileToCustomer && (
+                            <span className="absolute top-2 left-2 bg-blue-600 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow">Customizable</span>
+                        )}
                     </div>
                     <div className="p-3 sm:p-5 flex-1 flex flex-col">
                         <span className="text-[10px] sm:text-xs font-semibold text-blue-600 uppercase mb-1">{product.category}</span>
@@ -283,7 +289,7 @@
                         )}
                         <div className="mt-auto flex items-center justify-between">
                             <span className="text-sm sm:text-xl font-bold text-slate-900">₹{parseFloat(currentSize.price).toFixed(2)}</span>
-                            <button onClick={() => addToCart(product, currentSize)} className="bg-slate-900 text-white p-2 rounded-lg hover:bg-slate-800 transition-colors">
+                            <button onClick={() => { addToCart(product, currentSize); alert('Added to cart!'); }} className="bg-slate-900 text-white p-2 rounded-lg hover:bg-slate-800 transition-colors">
                                 <Icons.ShoppingCart className="w-4 h-4 sm:w-5 sm:h-5" />
                             </button>
                         </div>
@@ -327,7 +333,7 @@
                             )}
                             <div className="flex items-center justify-between mt-4 pt-4 border-t">
                                 <span className="text-3xl font-black text-slate-900">₹{parseFloat(currentSize.price).toFixed(2)}</span>
-                                <button onClick={() => { addToCart(product, currentSize); alert('Successfully added to cart!'); }} className="bg-blue-600 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg">
+                                <button onClick={() => { addToCart(product, currentSize); alert('Added to cart!'); }} className="bg-blue-600 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg">
                                     <Icons.ShoppingCart className="w-5 h-5" /> Add to Cart
                                 </button>
                             </div>
@@ -396,17 +402,39 @@
             );
         }
 
+        // ==========================================
+        // DYNAMIC VALIDATION ACCORDING TO ADMIN CHOICE
+        // ==========================================
         function CartPage({ setCurrentTab }) {
-            const { cart, removeFromCart, updateQuantity, clearCart, user, addOrder } = useStore();
+            const { cart, removeFromCart, updateQuantity, clearCart, user, addOrder, updateCartItemFile } = useStore();
             const [isCheckingOut, setIsCheckingOut] = useState(false);
             const [success, setSuccess] = useState(false);
             const total = cart.reduce((sum, item) => sum + (parseFloat(item.selectedSize?.price || item.price) * item.quantity), 0);
 
+            const handleFileChange = (index, e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                        updateCartItemFile(index, reader.result);
+                    };
+                    reader.readAsDataURL(file);
+                }
+            };
+
             const handleCheckout = () => {
                 if (!user) { setCurrentTab('auth'); return; }
                 if (cart.length === 0) return;
+
+                // CONDITIONAL DYNAMIC VALIDATION RULE
+                // Only block checkout if 'fileToCustomer' is true AND referenceFile is completely empty
+                const missingRequiredFiles = cart.some(item => item.fileToCustomer && !item.referenceFile);
+                if (missingRequiredFiles) {
+                    alert("ભૂલ: આ પ્રોડક્ટ માટે તમારો ફોટો/ડિઝાઇન ફાઇલ અપલોડ કરવી ફરજિયાત છે! કૃપા કરીને ફાઇલ સિલેક્ટ કરો.");
+                    return;
+                }
+
                 setIsCheckingOut(true);
-                
                 const newOrder = { 
                     id: 'ORD-' + Date.now(), 
                     userId: user.email, 
@@ -434,44 +462,64 @@
                 });
             };
 
-            if (success) return (
-                <div className="max-w-md mx-auto mt-20 p-8 bg-white rounded-xl text-center border">
-                    <h2 className="text-2xl font-bold text-slate-900 mb-2">Order Confirmed!</h2>
-                    <p className="text-slate-600">Your order details are recorded securely inside your box profile.</p>
-                </div>
-            );
-
             return (
                 <div className="max-w-4xl mx-auto px-4 py-6 pb-24">
-                    <h1 className="text-3xl font-bold text-slate-900 mb-8 tracking-tight">Your Cart</h1>
+                    <h1 className="text-3xl font-bold text-slate-900 mb-8 tracking-tight">Your Shopping Cart</h1>
                     {cart.length === 0 ? (
                         <div className="text-center py-20 bg-white rounded-xl border"><p>Your cart is empty.</p></div>
                     ) : (
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                             <div className="lg:col-span-2 space-y-4">
                                 {cart.map((item, index) => (
-                                    <div key={index} className="flex flex-col sm:flex-row items-center gap-4 bg-white p-4 rounded-xl border shadow-sm">
-                                        <img src={item.images?.[0] || 'https://via.placeholder.com/100'} className="w-24 h-24 rounded-lg object-cover" />
-                                        <div className="flex-1 text-center sm:text-left">
-                                            <h3 className="font-semibold text-lg text-slate-900">{item.name}</h3>
-                                            <p className="font-bold text-blue-600">₹{parseFloat(item.selectedSize?.price || item.price).toFixed(2)}</p>
-                                        </div>
-                                        <div className="flex items-center gap-4">
-                                            <div className="flex items-center gap-2 bg-slate-50 border rounded-lg p-1">
-                                                <button onClick={() => updateQuantity(index, Math.max(1, item.quantity - 1))} className="p-1"><Icons.Minus className="w-4 h-4" /></button>
-                                                <span className="w-8 text-center font-medium">{item.quantity}</span>
-                                                <button onClick={() => updateQuantity(index, item.quantity + 1)} className="p-1"><Icons.Plus className="w-4 h-4" /></button>
+                                    <div key={index} className="flex flex-col bg-white p-4 rounded-xl border shadow-sm space-y-4">
+                                        <div className="flex flex-col sm:flex-row items-center gap-4">
+                                            <img src={item.images?.[0] || 'https://via.placeholder.com/100'} className="w-24 h-24 rounded-lg object-cover border" />
+                                            <div className="flex-1 text-center sm:text-left">
+                                                <h3 className="font-semibold text-lg text-slate-900">{item.name}</h3>
+                                                <p className="text-xs text-slate-400">Size: {item.selectedSize?.name || 'Standard'}</p>
+                                                <p className="font-bold text-blue-600">₹{parseFloat(item.selectedSize?.price || item.price).toFixed(2)}</p>
                                             </div>
-                                            <button onClick={() => removeFromCart(index)} className="p-2 text-red-500 rounded-lg"><Icons.Trash2 className="w-5 h-5" /></button>
+                                            <div className="flex items-center gap-4">
+                                                <div className="flex items-center gap-2 bg-slate-50 border rounded-lg p-1">
+                                                    <button onClick={() => updateQuantity(index, Math.max(1, item.quantity - 1))} className="p-1"><Icons.Minus className="w-4 h-4" /></button>
+                                                    <span className="w-8 text-center font-medium">{item.quantity}</span>
+                                                    <button onClick={() => updateQuantity(index, item.quantity + 1)} className="p-1"><Icons.Plus className="w-4 h-4" /></button>
+                                                </div>
+                                                <button onClick={() => removeFromCart(index)} className="p-2 text-red-500 rounded-lg"><Icons.Trash2 className="w-5 h-5" /></button>
+                                            </div>
                                         </div>
+                                        
+                                        {/* CONDITIONAL PHOTO FIELD BASED ON ADMIN SELECTION */}
+                                        {item.fileToCustomer ? (
+                                            <div className="bg-blue-50/50 p-3 rounded-lg border border-blue-100 space-y-2">
+                                                <label className="block text-xs font-bold text-blue-900 uppercase tracking-wider">
+                                                    ⚠️ Upload Your Custom Photo/3D File (REQUIRED)
+                                                </label>
+                                                <input type="file" accept="image/*" required className="w-full text-xs text-slate-600 bg-white border p-1.5 rounded" onChange={(e) => handleFileChange(index, e)} />
+                                                {item.referenceFile ? (
+                                                    <div className="flex items-center gap-2 text-xs text-green-700 font-bold bg-green-50 p-1.5 rounded">
+                                                        <span>✓ Photo Attached</span>
+                                                        <img src={item.referenceFile} className="w-10 h-10 object-cover border rounded shadow-xs ml-auto" />
+                                                    </div>
+                                                ) : (
+                                                    <span className="block text-xs text-red-600 font-semibold animate-pulse">✖ Photo missing! Please upload a file to confirm order.</span>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <div className="bg-slate-50 p-2 rounded-lg border text-xs text-slate-500 italic">
+                                                No reference photo needed for this standard/common item.
+                                            </div>
+                                        )}
                                     </div>
                                 ))}
                             </div>
                             <div className="lg:col-span-1">
-                                <div className="bg-white p-6 rounded-xl border shadow-sm">
+                                <div className="bg-white p-6 rounded-xl border shadow-sm sticky top-20">
                                     <h2 className="text-xl font-bold mb-6">Order Summary</h2>
-                                    <div className="flex justify-between font-bold text-lg border-t pt-4"><span>Total</span><span>₹{total.toFixed(2)}</span></div>
-                                    <button onClick={handleCheckout} disabled={isCheckingOut} className="w-full mt-4 py-3 bg-slate-900 text-white rounded-lg hover:bg-slate-800 font-medium">Checkout Now</button>
+                                    <div className="flex justify-between font-bold text-lg border-t pt-4 mb-4"><span>Total</span><span>₹{total.toFixed(2)}</span></div>
+                                    <button onClick={handleCheckout} disabled={isCheckingOut} className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow transition">
+                                        Confirm & Checkout Order
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -480,9 +528,6 @@
             );
         }
 
-        // ==========================================
-        // 4. FULLY FIXED PROFILE PAGE (With Verification Guard)
-        // ==========================================
         function ProfilePage({ setCurrentTab }) {
             const { user, setUser, orders, saveUserProfileInDatabase } = useStore();
             const [isEditing, setIsEditing] = useState(false);
@@ -504,7 +549,6 @@
             if (!user) return null;
             const myOrders = orders.filter(o => o.userId === user.email);
 
-            // Security Trigger: Request current password before opening input editing boxes
             const triggerPasswordVerification = () => {
                 const checkPass = prompt("Security Check: Enter your current password to unlock editing:");
                 if (checkPass === null) return;
@@ -551,7 +595,7 @@
                                 <p className="border-b pb-1"><span className="text-slate-400 text-sm">City / Village Address:</span> <br />{user.village || 'Not Filled'}</p>
                                 <p className="border-b pb-1"><span className="text-slate-400 text-sm">Locality / Area / Street:</span> <br />{user.locality || 'Not Filled'}</p>
                                 <p className="border-b pb-1"><span className="text-slate-400 text-sm">Area Pincode:</span> <br />{user.pincode || 'Not Filled'}</p>
-                                <p className="border-b pb-1"><span className="text-slate-400 text-sm">Secure Password:</span> <br />•••••••• <span className="text-xs text-blue-500 ml-2">(Hidden for privacy)</span></p>
+                                <p className="border-b pb-1"><span className="text-slate-400 text-sm">Secure Password:</span> <br />••••••••</p>
                             </div>
                         ) : (
                             <form onSubmit={handleSaveProfile} className="space-y-4">
@@ -573,8 +617,22 @@
                                 <div key={o.id} className="bg-white p-4 rounded-xl border shadow-sm">
                                     <div className="flex justify-between font-bold border-b pb-2 mb-2"><span>ID: {o.id}</span><span>{o.date}</span></div>
                                     <div className="mb-2 text-sm font-bold">Status: {o.status}</div>
-                                    {o.items.map((i, idx) => <div key={idx} className="flex justify-between text-sm py-0.5"><span>{i.quantity}x {i.name}</span><span>₹{(parseFloat(i.selectedSize?.price || i.price) * i.quantity).toFixed(2)}</span></div>)}
-                                    <div className="flex justify-between font-bold mt-2 pt-2 border-t"><span>Total</span><span>₹{(o.total || 0).toFixed(2)}</span></div>
+                                    <div className="space-y-2 mt-2">
+                                        {(o.items || []).map((i, idx) => (
+                                            <div key={idx} className="flex flex-col bg-slate-50 p-2 rounded border text-xs space-y-1">
+                                                <div className="flex justify-between font-medium text-slate-800">
+                                                    <span>{i.quantity}x {i.name} ({i.selectedSize?.name || 'Standard'})</span>
+                                                    <span>₹{(parseFloat(i.selectedSize?.price || i.price) * i.quantity).toFixed(2)}</span>
+                                                </div>
+                                                {i.referenceFile && (
+                                                    <div className="flex items-center gap-2 pt-1 border-t border-dashed mt-1">
+                                                        <a href={i.referenceFile} download={`design-${o.id}-${idx}.png`} className="text-[10px] text-blue-600 underline font-bold">View Attached Image</a>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div className="flex justify-between font-bold mt-3 pt-2 border-t"><span>Total</span><span>₹{(o.total || 0).toFixed(2)}</span></div>
                                 </div>
                             ))}
                         </div>
@@ -587,7 +645,9 @@
             const { user, products, addOrUpdateProduct, deleteProduct, orders, updateOrderStatus, cancelOrderPermanently, customRequests, deleteCustomRequest, invitedAdmins } = useStore();
             const [adminTab, setAdminTab] = useState('products'); 
             const [view, setView] = useState('list');
-            const [formData, setFormData] = useState({ id:'', name: '', description: '', category: '', images: [] });
+            
+            // ADMIN INPUT SYSTEM EXTENSION LAYER
+            const [formData, setFormData] = useState({ id:'', name: '', description: '', category: '', images: [], fileToCustomer: false });
             const [sizeCount, setSizeCount] = useState(1);
             const [sizes, setSizes] = useState([{ name: '', price: '' }]);
 
@@ -605,12 +665,29 @@
                 });
             };
 
+            const handleImageUpload = (e) => {
+                const files = Array.from(e.target.files);
+                if (files.length > 0) {
+                    const readers = files.map(file => {
+                        return new Promise((resolve) => {
+                            const reader = new FileReader();
+                            reader.onloadend = () => resolve(reader.result);
+                            reader.readAsDataURL(file);
+                        });
+                    });
+                    Promise.all(readers).then(imagesBase64 => setFormData(prev => ({ ...prev, images: [...prev.images, ...imagesBase64] })));
+                }
+            };
+
             const handleSave = (e) => {
                 e.preventDefault();
                 const formattedSizes = sizes.map(s => ({ name: s.name, price: parseFloat(s.price) || 0 }));
                 const payload = { ...formData, sizes: formattedSizes, price: formattedSizes[0]?.price || 0 };
                 if (!formData.id) payload.id = 'p' + Date.now();
-                addOrUpdateProduct(payload).then(() => setView('list'));
+                addOrUpdateProduct(payload).then(() => {
+                    setFormData({ id:'', name: '', description: '', category: '', images: [], fileToCustomer: false });
+                    setView('list');
+                });
             };
 
             return (
@@ -618,7 +695,7 @@
                     <h1 className="text-2xl font-bold text-slate-900 mb-6">Admin Dashboard</h1>
                     <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
                         <button onClick={() => setAdminTab('products')} className={`px-4 py-2 font-bold text-sm rounded-lg ${adminTab === 'products' ? 'bg-slate-900 text-white' : 'bg-slate-200'}`}>Products</button>
-                        <button onClick={() => setAdminTab('orders')} className={`px-4 py-2 font-bold text-sm rounded-lg ${adminTab === 'orders' ? 'bg-slate-900 text-white' : 'bg-slate-200'}`}>Orders</button>
+                        <button onClick={() => setAdminTab('orders')} className={`px-4 py-2 font-bold text-sm rounded-lg ${adminTab === 'orders' ? 'bg-slate-900 text-white' : 'bg-slate-200'}`}>Orders Inbox</button>
                         <button onClick={() => setAdminTab('customReqs')} className={`px-4 py-2 font-bold text-sm rounded-lg ${adminTab === 'customReqs' ? 'bg-slate-900 text-white' : 'bg-slate-200'}`}>Custom Requests</button>
                     </div>
 
@@ -633,7 +710,10 @@
                                         <tbody className="divide-y">
                                             {products.map(p => (
                                                 <tr key={p.id}>
-                                                    <td className="px-6 py-4 font-medium text-slate-900">{p.name}</td>
+                                                    <td className="px-6 py-4 font-medium text-slate-900 flex items-center gap-2">
+                                                        {p.name} 
+                                                        {p.fileToCustomer && <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 rounded font-bold">File Required</span>}
+                                                    </td>
                                                     <td className="px-6 py-4 text-right"><button onClick={() => deleteProduct(p.id)} className="text-red-600">Remove</button></td>
                                                 </tr>
                                             ))}
@@ -646,6 +726,16 @@
                                     <input type="text" placeholder="Product Name" required className="w-full p-2 border rounded" onChange={e => setFormData({...formData, name: e.target.value})} />
                                     <input type="text" placeholder="Category" required className="w-full p-2 border rounded" onChange={e => setFormData({...formData, category: e.target.value})} />
                                     <textarea placeholder="Description" required className="w-full p-2 border rounded" onChange={e => setFormData({...formData, description: e.target.value})} />
+                                    <input type="file" multiple accept="image/*" className="w-full border p-2" onChange={handleImageUpload} />
+                                    
+                                    {/* FEATURE ADDED: ADMIN CRITICAL SELECTION CHECKBOX LAYOUT */}
+                                    <div className="bg-blue-50 p-3 rounded-lg border border-blue-200 flex items-center gap-3">
+                                        <input type="checkbox" id="fileToCustomer" className="w-5 h-5 accent-blue-600 cursor-pointer" checked={formData.fileToCustomer} onChange={e => setFormData({...formData, fileToCustomer: e.target.checked})} />
+                                        <label htmlFor="fileToCustomer" className="text-sm font-bold text-blue-950 cursor-pointer select-none">
+                                            File to Customer (ગ્રાહક પાસેથી આ પ્રોડક્ટ માટે ફરજિયાત ફોટો મંગાવવા આ બોક્સ સિલેક્ટ કરો)
+                                        </label>
+                                    </div>
+
                                     <select value={sizeCount} onChange={handleSizeCountChange} className="border p-2 rounded bg-white w-full">
                                         {[...Array(10)].map((_, i) => <option key={i+1} value={i+1}>{i+1} Size Options</option>)}
                                     </select>
@@ -665,10 +755,30 @@
                         <div className="space-y-4">
                             {orders.map(o => (
                                 <div key={o.id} className="bg-white p-5 border rounded-xl shadow-sm">
-                                    <div className="flex justify-between font-bold border-b pb-2 mb-2"><span>ID: {o.id}</span><span>₹{(o.total || 0).toFixed(2)}</span></div>
+                                    <div className="flex justify-between font-bold border-b pb-2 mb-2"><span>ID: {o.id}</span><span className="text-blue-600">₹{(o.total || 0).toFixed(2)}</span></div>
                                     <p className="text-sm">Client: {o.address?.name} ({o.address?.mobile})</p>
-                                    <p className="text-xs text-slate-500">Address: {o.address?.village}, {o.address?.locality}, {o.address?.pincode}</p>
-                                    <div className="mt-4 flex justify-between items-center flex-wrap gap-2">
+                                    <p className="text-xs text-slate-500 mb-3">Address Box: {o.address?.village}, {o.address?.locality}, {o.address?.pincode}</p>
+                                    
+                                    <div className="bg-blue-50 border p-3 rounded-lg my-3 space-y-2">
+                                        <p className="text-xs font-bold text-blue-900 uppercase">📦 Ordered Item blueprints & reference photos:</p>
+                                        {(o.items || []).map((item, idx) => (
+                                            <div key={idx} className="bg-white p-2 border rounded flex items-center justify-between gap-4">
+                                                <div>
+                                                    <p className="text-xs font-bold text-slate-800">{item.name} (x{item.quantity})</p>
+                                                    <p className="text-[10px] text-slate-500">Size: {item.selectedSize?.name || 'Standard'}</p>
+                                                </div>
+                                                {item.referenceFile ? (
+                                                    <a href={item.referenceFile} target="_blank" download={`print-${o.id}-${idx}.png`} className="block w-16 h-16 border rounded bg-slate-100 overflow-hidden">
+                                                        <img src={item.referenceFile} className="w-full h-full object-cover" />
+                                                    </a>
+                                                ) : (
+                                                    <span className="text-xs text-slate-400 italic">No custom photo required</span>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    <div className="mt-4 flex justify-between items-center flex-wrap gap-2 border-t pt-2">
                                         <span className={`text-xs px-2.5 py-1 rounded font-bold ${o.status === 'Cancelled' ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'}`}>Status: {o.status}</span>
                                         <div className="flex gap-2">
                                             {o.status === 'Pending' && <button onClick={() => updateOrderStatus(o.id, 'Confirmed')} className="bg-blue-600 text-white text-xs px-3 py-1.5 rounded font-bold">Confirm</button>}
@@ -699,9 +809,6 @@
             );
         }
 
-        // ==========================================
-        // 5. SIGN-IN & SIGN-UP AUTH PAGE
-        // ==========================================
         function AuthPage({ setCurrentTab }) {
             const { setUser } = useStore();
             const [isLogin, setIsLogin] = useState(true);
@@ -735,13 +842,13 @@
                         setCurrentTab('home');
                     }
                 } catch (err) { 
-                    setError('Authentication Failed: Make sure data structure is valid.'); 
+                    setError('Authentication Failed.'); 
                 }
             };
 
             return (
                 <div className="max-w-md mx-auto mt-10 mb-24 bg-white p-8 border rounded-xl shadow-sm">
-                    <h2 className="text-2xl font-bold text-center mb-6">{isLogin ? 'Sign In / Sign Out' : 'Create Account (Open Box)'}</h2>
+                    <h2 className="text-2xl font-bold text-center mb-6">{isLogin ? 'Sign In' : 'Create Account (Open Box)'}</h2>
                     {error && <div className="mb-4 p-2 bg-red-50 text-red-600 text-center text-sm">{error}</div>}
                     <form onSubmit={handleSubmit} className="space-y-4">
                         {!isLogin && (
