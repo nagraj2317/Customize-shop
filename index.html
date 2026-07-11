@@ -545,6 +545,18 @@
                 });
             };
 
+            // ✅ એડમિન માટે પ્રોડક્ટ ફોટો અપલોડ ફંક્શન પાછું ઉમેર્યું!
+            const handleImageUpload = (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                        setFormData(prev => ({ ...prev, images: [reader.result] }));
+                    };
+                    reader.readAsDataURL(file);
+                }
+            };
+
             // HIGH SPEED DYNAMIC FULL-CARD SNAPSHOT DOWNLOAD SYSTEM
             const captureAndDownloadCardBox = () => {
                 if (!cardPrintRef.current) return;
@@ -605,9 +617,19 @@
                             )}
                             {view === 'add' && (
                                 <form onSubmit={handleSave} className="bg-white p-5 border rounded-xl space-y-4">
+                                    {/* ✅ પ્રોડક્ટ ફોટો અપલોડ બટન પાછું મૂકવામાં આવ્યું */}
+                                    <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-2">
+                                        <label className="text-xs font-bold text-slate-700 block">પ્રોડક્ટનો ફોટો અપલોડ કરો (Product Image):</label>
+                                        <input type="file" accept="image/*" onChange={handleImageUpload} className="w-full p-2 border bg-white rounded text-xs" />
+                                        {formData.images && formData.images[0] && (
+                                            <img src={formData.images[0]} alt="Preview" className="w-24 h-24 object-cover border rounded-lg mt-2" />
+                                        )}
+                                    </div>
+                                    
                                     <input type="text" placeholder="Product Name" required className="w-full p-2 border rounded text-xs" onChange={e => setFormData({...formData, id: 'p'+Date.now(), name: e.target.value})} />
                                     <input type="text" placeholder="Category" required className="w-full p-2 border rounded text-xs" onChange={e => setFormData({...formData, category: e.target.value})} />
                                     <textarea placeholder="Description" required className="w-full p-2 border rounded text-xs" onChange={e => setFormData({...formData, description: e.target.value})} />
+                                    
                                     <div className="bg-blue-50 p-3 rounded-lg border flex items-center gap-3">
                                         <input type="checkbox" id="fileToCustomer" className="w-4 h-4 accent-blue-600 cursor-pointer" checked={formData.fileToCustomer} onChange={e => setFormData({...formData, fileToCustomer: e.target.checked})} />
                                         <label htmlFor="fileToCustomer" className="text-xs font-bold text-blue-950 cursor-pointer">File to Customer (ગ્રાહક પાસેથી ફોટો મંગાવવો)</label>
