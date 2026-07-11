@@ -545,16 +545,35 @@
                 });
             };
 
-            // ✅ એડમિન માટે પ્રોડક્ટ ફોટો અપલોડ ફંક્શન પાછું ઉમેર્યું!
-            const handleImageUpload = (e) => {
-                const file = e.target.files[0];
-                if (file) {
-                    const reader = new FileReader();
-                    reader.onloadend = () => {
-                        setFormData(prev => ({ ...prev, images: [reader.result] }));
-                    };
-                    reader.readAsDataURL(file);
+            // ✅ એડમિન માટે એકસાથે ઘણા ફોટા (Multiple Images) અપલોડ કરવાનું ફંક્શન
+            const handleImageUpload = async (e) => {
+                const files = Array.from(e.target.files);
+                if (files.length === 0) return;
+
+                const promises = files.map(file => {
+                    return new Promise((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.onloadend = () => resolve(reader.result);
+                        reader.onerror = reject;
+                        reader.readAsDataURL(file);
+                    });
+                });
+
+                try {
+                    const base64Images = await Promise.all(promises);
+                    setFormData(prev => ({ ...prev, images: [...(prev.images || []), ...base64Images] }));
+                } catch (error) {
+                    console.log("Error reading images", error);
+                    alert("ફોટા અપલોડ કરવામાં ભૂલ આવી!");
                 }
+            };
+
+            // ખોટો ફોટો ડીલીટ કરવા માટે
+            const removeImage = (indexToRemove) => {
+                setFormData(prev => ({
+                    ...prev,
+                    images: prev.images.filter((_, idx) => idx !== indexToRemove)
+                }));
             };
 
             // HIGH SPEED DYNAMIC FULL-CARD SNAPSHOT DOWNLOAD SYSTEM
@@ -617,12 +636,21 @@
                             )}
                             {view === 'add' && (
                                 <form onSubmit={handleSave} className="bg-white p-5 border rounded-xl space-y-4">
-                                    {/* ✅ પ્રોડક્ટ ફોટો અપલોડ બટન પાછું મૂકવામાં આવ્યું */}
+                                    {/* ✅ મલ્ટીપલ પ્રોડક્ટ ફોટો અપલોડ બોક્સ */}
                                     <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-2">
-                                        <label className="text-xs font-bold text-slate-700 block">પ્રોડક્ટનો ફોટો અપલોડ કરો (Product Image):</label>
-                                        <input type="file" accept="image/*" onChange={handleImageUpload} className="w-full p-2 border bg-white rounded text-xs" />
-                                        {formData.images && formData.images[0] && (
-                                            <img src={formData.images[0]} alt="Preview" className="w-24 h-24 object-cover border rounded-lg mt-2" />
+                                        <label className="text-xs font-bold text-slate-700 block">પ્રોડક્ટના ફોટા અપલોડ કરો (એકથી વધુ સિલેક્ટ કરી શકો છો):</label>
+                                        <input type="file" accept="image/*" multiple onChange={handleImageUpload} className="w-full p-2 border bg-white rounded text-xs" />
+                                        
+                                        {/* પસંદ કરેલા ફોટાઓનું લિસ્ટ દેખાશે */}
+                                        {formData.images && formData.images.length > 0 && (
+                                            <div className="flex gap-3 overflow-x-auto mt-3 pb-2">
+                                                {formData.images.map((img, idx) => (
+                                                    <div key={idx} className="relative flex-shrink-0">
+                                                        <img src={img} alt="Preview" className="w-20 h-20 object-cover border rounded-lg shadow-sm" />
+                                                        <button type="button" onClick={() => removeImage(idx)} className="absolute -top-2 -right-2 bg-red-500 text-white w-5 h-5 flex items-center justify-center rounded-full text-[10px] font-bold border border-white shadow-sm">X</button>
+                                                    </div>
+                                                ))}
+                                            </div>
                                         )}
                                     </div>
                                     
