@@ -110,11 +110,7 @@
                     const prods = [];
                     snapshot.forEach(doc => prods.push(doc.data()));
                     setProducts(prods);
-
-                    if (cart && cart.length > 0) {
-                        const validProductIds = prods.map(p => p.id);
-                        setCart(prevCart => prevCart.filter(item => validProductIds.includes(item.id)));
-                    }
+                    // ✅ અહીંથી કાર્ટને ડિસ્ટર્બ કરતો કોડ કાઢી નાખ્યો છે જેથી બ્લિંક થવાનું બંધ થઈ જાય
                 });
 
                 const unsubOrders = window.fb.onSnapshot(window.fb.collection(window.db, "orders"), (snapshot) => {
@@ -146,9 +142,15 @@
                 };
             }, [isFirebaseReady, user?.email]);
 
+            // ✅ એરર હેન્ડલિંગ સાથે પ્રોડક્ટ સેવ કરવાનું ફંક્શન
             const addOrUpdateProduct = async (prod) => {
                 if (!isFirebaseReady) return;
-                await window.fb.setDoc(window.fb.doc(window.db, "products", prod.id), prod);
+                try {
+                    await window.fb.setDoc(window.fb.doc(window.db, "products", prod.id), prod);
+                } catch (err) {
+                    alert("ફાયરબેઝ ડેટાબેઝ એરર: " + err.message);
+                    throw err; // આગળ વધતા અટકાવવા
+                }
             };
             const deleteProduct = async (id) => {
                 if (!isFirebaseReady) return;
@@ -545,7 +547,7 @@
                 });
             };
 
-            // ✅ એડમિન માટે એકસાથે ઘણા ફોટા (Multiple Images) અપલોડ કરવાનું અને સાઇઝ નાની (Compress) કરવાનું ફંક્શન
+            // ✅ એડમિન માટે એકસાથે ઘણા ફોટા અપલોડ અને સાઇઝ નાની (Compress) કરવાનું પાવરફુલ ફંક્શન
             const handleImageUpload = async (e) => {
                 const files = Array.from(e.target.files);
                 if (files.length === 0) return;
@@ -556,10 +558,9 @@
                         reader.onload = (event) => {
                             const img = new Image();
                             img.onload = () => {
-                                // 1. ડેટાબેઝ માટે ફોટાની સાઈઝ નાની કરવા કેનવાસનો ઉપયોગ
                                 const canvas = document.createElement('canvas');
-                                const MAX_WIDTH = 600; // ફોટો વધુમાં વધુ 600px પહોળો
-                                const MAX_HEIGHT = 600;
+                                const MAX_WIDTH = 400; // ફોટો બહુ મોટો ન બને તે માટે સાઈઝ ઘટાડી છે
+                                const MAX_HEIGHT = 400;
                                 let width = img.width;
                                 let height = img.height;
 
@@ -574,8 +575,8 @@
                                 const ctx = canvas.getContext('2d');
                                 ctx.drawImage(img, 0, 0, width, height);
                                 
-                                // 2. ફોટાને JPEG માં કન્વર્ટ કરો અને 70% ક્વોલિટી સેટ કરો (આનાથી સાઈઝ 1MB ની અંદર આવી જશે)
-                                const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.7);
+                                // ✅ અહીં ફોટાની સાઈઝ માત્ર 50% કરી છે, જેથી બિલકુલ જગ્યા ન રોકે
+                                const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.5); 
                                 resolve(compressedDataUrl);
                             };
                             img.src = event.target.result;
@@ -625,22 +626,33 @@
                 });
             };
 
+            // ✅ શુદ્ધ પેલોડ સેવ કરવા માટેની સિસ્ટમ 
             const handleSave = (e) => {
                 e.preventDefault();
                 const formattedSizes = sizes.map(s => ({ name: s.name, price: parseFloat(s.price) || 0 }));
-                
-                // નવો ID જાતે સેટ કરો જો ન હોય
                 const productId = formData.id || 'p' + Date.now();
+                
+                // નકામો ડેટા ફાયરબેઝમાં જતા અટકાવવા માટે પેલોડ સાફ કર્યો
+                const payload = {
+                    id: productId,
+                    name: formData.name || '',
+                    description: formData.description || '',
+                    category: formData.category || '',
+                    images: formData.images || [],
+                    fileToCustomer: formData.fileToCustomer || false,
+                    sizes: formattedSizes,
+                    price: formattedSizes[0]?.price || 0
+                };
 
-                addOrUpdateProduct({ ...formData, id: productId, sizes: formattedSizes, price: formattedSizes[0]?.price || 0 })
+                addOrUpdateProduct(payload)
                 .then(() => {
-                    alert("પ્રોડક્ટ ડેટાબેઝમાં સફળતાપૂર્વક સેવ થઈ ગઈ!");
+                    alert("પ્રોડક્ટ ડેટાબેઝમાં સફળતાપૂર્વક કાયમી સેવ થઈ ગઈ!");
                     setFormData({ id:'', name: '', description: '', category: '', images: [], fileToCustomer: false }); 
                     setView('list');
                 })
                 .catch(err => {
+                    // જો ફાયરબેઝ રિજેક્ટ કરશે તો અહીં એરર દેખાશે
                     console.error("Save error:", err);
-                    alert("સેવ કરવામાં ભૂલ! ઇન્ટરનેટ કનેક્શન ચેક કરો.");
                 });
             };
 
