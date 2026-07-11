@@ -545,7 +545,7 @@
                 });
             };
 
-            // ✅ એડમિન માટે એકસાથે ઘણા ફોટા (Multiple Images) અપલોડ કરવાનું ફંક્શન
+            // ✅ એડમિન માટે એકસાથે ઘણા ફોટા (Multiple Images) અપલોડ કરવાનું અને સાઇઝ નાની (Compress) કરવાનું ફંક્શન
             const handleImageUpload = async (e) => {
                 const files = Array.from(e.target.files);
                 if (files.length === 0) return;
@@ -553,18 +553,44 @@
                 const promises = files.map(file => {
                     return new Promise((resolve, reject) => {
                         const reader = new FileReader();
-                        reader.onloadend = () => resolve(reader.result);
+                        reader.onload = (event) => {
+                            const img = new Image();
+                            img.onload = () => {
+                                // 1. ડેટાબેઝ માટે ફોટાની સાઈઝ નાની કરવા કેનવાસનો ઉપયોગ
+                                const canvas = document.createElement('canvas');
+                                const MAX_WIDTH = 600; // ફોટો વધુમાં વધુ 600px પહોળો
+                                const MAX_HEIGHT = 600;
+                                let width = img.width;
+                                let height = img.height;
+
+                                if (width > height) {
+                                    if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; }
+                                } else {
+                                    if (height > MAX_HEIGHT) { width *= MAX_HEIGHT / height; height = MAX_HEIGHT; }
+                                }
+                                canvas.width = width;
+                                canvas.height = height;
+                                
+                                const ctx = canvas.getContext('2d');
+                                ctx.drawImage(img, 0, 0, width, height);
+                                
+                                // 2. ફોટાને JPEG માં કન્વર્ટ કરો અને 70% ક્વોલિટી સેટ કરો (આનાથી સાઈઝ 1MB ની અંદર આવી જશે)
+                                const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.7);
+                                resolve(compressedDataUrl);
+                            };
+                            img.src = event.target.result;
+                        };
                         reader.onerror = reject;
                         reader.readAsDataURL(file);
                     });
                 });
 
                 try {
-                    const base64Images = await Promise.all(promises);
-                    setFormData(prev => ({ ...prev, images: [...(prev.images || []), ...base64Images] }));
+                    const compressedImages = await Promise.all(promises);
+                    setFormData(prev => ({ ...prev, images: [...(prev.images || []), ...compressedImages] }));
                 } catch (error) {
-                    console.log("Error reading images", error);
-                    alert("ફોટા અપલોડ કરવામાં ભૂલ આવી!");
+                    console.log("Error processing images", error);
+                    alert("ફોટા પ્રોસેસ કરવામાં ભૂલ આવી!");
                 }
             };
 
@@ -602,8 +628,19 @@
             const handleSave = (e) => {
                 e.preventDefault();
                 const formattedSizes = sizes.map(s => ({ name: s.name, price: parseFloat(s.price) || 0 }));
-                addOrUpdateProduct({ ...formData, sizes: formattedSizes, price: formattedSizes[0]?.price || 0 }).then(() => {
-                    setFormData({ id:'', name: '', description: '', category: '', images: [], fileToCustomer: false }); setView('list');
+                
+                // નવો ID જાતે સેટ કરો જો ન હોય
+                const productId = formData.id || 'p' + Date.now();
+
+                addOrUpdateProduct({ ...formData, id: productId, sizes: formattedSizes, price: formattedSizes[0]?.price || 0 })
+                .then(() => {
+                    alert("પ્રોડક્ટ ડેટાબેઝમાં સફળતાપૂર્વક સેવ થઈ ગઈ!");
+                    setFormData({ id:'', name: '', description: '', category: '', images: [], fileToCustomer: false }); 
+                    setView('list');
+                })
+                .catch(err => {
+                    console.error("Save error:", err);
+                    alert("સેવ કરવામાં ભૂલ! ઇન્ટરનેટ કનેક્શન ચેક કરો.");
                 });
             };
 
@@ -654,9 +691,9 @@
                                         )}
                                     </div>
                                     
-                                    <input type="text" placeholder="Product Name" required className="w-full p-2 border rounded text-xs" onChange={e => setFormData({...formData, id: 'p'+Date.now(), name: e.target.value})} />
-                                    <input type="text" placeholder="Category" required className="w-full p-2 border rounded text-xs" onChange={e => setFormData({...formData, category: e.target.value})} />
-                                    <textarea placeholder="Description" required className="w-full p-2 border rounded text-xs" onChange={e => setFormData({...formData, description: e.target.value})} />
+                                    <input type="text" placeholder="Product Name" required className="w-full p-2 border rounded text-xs" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
+                                    <input type="text" placeholder="Category" required className="w-full p-2 border rounded text-xs" value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})} />
+                                    <textarea placeholder="Description" required className="w-full p-2 border rounded text-xs" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} />
                                     
                                     <div className="bg-blue-50 p-3 rounded-lg border flex items-center gap-3">
                                         <input type="checkbox" id="fileToCustomer" className="w-4 h-4 accent-blue-600 cursor-pointer" checked={formData.fileToCustomer} onChange={e => setFormData({...formData, fileToCustomer: e.target.checked})} />
@@ -667,8 +704,8 @@
                                     </select>
                                     {sizes.map((size, idx) => (
                                         <div key={idx} className="flex gap-4">
-                                            <input type="text" placeholder="Size Name" required className="w-1/2 p-2 border rounded text-xs" onChange={(e) => { const n=[...sizes]; n[idx].name=e.target.value; setSizes(n); }} />
-                                            <input type="number" placeholder="Price" required className="w-1/2 p-2 border rounded text-xs" onChange={(e) => { const n=[...sizes]; n[idx].price=e.target.value; setSizes(n); }} />
+                                            <input type="text" placeholder="Size Name" required className="w-1/2 p-2 border rounded text-xs" value={size.name} onChange={(e) => { const n=[...sizes]; n[idx].name=e.target.value; setSizes(n); }} />
+                                            <input type="number" placeholder="Price" required className="w-1/2 p-2 border rounded text-xs" value={size.price} onChange={(e) => { const n=[...sizes]; n[idx].price=e.target.value; setSizes(n); }} />
                                         </div>
                                     ))}
                                     <button type="submit" className="w-full bg-slate-900 text-white p-2.5 rounded text-xs font-bold">Publish Product</button>
