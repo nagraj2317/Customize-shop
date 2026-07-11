@@ -110,7 +110,6 @@
                     const prods = [];
                     snapshot.forEach(doc => prods.push(doc.data()));
                     setProducts(prods);
-                    // ✅ અહીંથી કાર્ટને ડિસ્ટર્બ કરતો કોડ કાઢી નાખ્યો છે જેથી બ્લિંક થવાનું બંધ થઈ જાય
                 });
 
                 const unsubOrders = window.fb.onSnapshot(window.fb.collection(window.db, "orders"), (snapshot) => {
@@ -142,14 +141,13 @@
                 };
             }, [isFirebaseReady, user?.email]);
 
-            // ✅ એરર હેન્ડલિંગ સાથે પ્રોડક્ટ સેવ કરવાનું ફંક્શન
             const addOrUpdateProduct = async (prod) => {
                 if (!isFirebaseReady) return;
                 try {
                     await window.fb.setDoc(window.fb.doc(window.db, "products", prod.id), prod);
                 } catch (err) {
                     alert("ફાયરબેઝ ડેટાબેઝ એરર: " + err.message);
-                    throw err; // આગળ વધતા અટકાવવા
+                    throw err; 
                 }
             };
             const deleteProduct = async (id) => {
@@ -379,15 +377,37 @@
                 });
             }
 
+            // ✅ ગ્રાહકનો ફોટો કાર્ટમાં મુકતી વખતે ઓટોમેટિક સાઈઝ નાની કરવા માટે
             const handleFileChange = (index, e) => {
                 const file = e.target.files[0];
-                if (file) {
-                    const reader = new FileReader();
-                    reader.onloadend = () => updateCartItemFile(index, reader.result);
-                    reader.readAsDataURL(file);
-                }
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        const MAX_WIDTH = 400;
+                        const MAX_HEIGHT = 400;
+                        let width = img.width;
+                        let height = img.height;
+                        if (width > height) {
+                            if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; }
+                        } else {
+                            if (height > MAX_HEIGHT) { width *= MAX_HEIGHT / height; height = MAX_HEIGHT; }
+                        }
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+                        const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.5); // 50% Quality
+                        updateCartItemFile(index, compressedDataUrl);
+                    };
+                    img.src = event.target.result;
+                };
+                reader.readAsDataURL(file);
             };
 
+            // ✅ ઓર્ડરમાંથી બધો નકામો અને ભારે ડેટા કાઢીને ચેકઆઉટ કરવા માટે
             const handleCheckout = () => {
                 if (!user) { setCurrentTab('auth'); return; }
                 if (!cart || cart.length === 0) return;
@@ -396,14 +416,29 @@
                     alert("ભૂલ: આ પ્રોડક્ટ માટે તમારો ફોટો/ડિઝાઇન ફાઇલ અપલોડ કરવી ફરજિયાત છે!"); return;
                 }
                 setIsCheckingOut(true);
+
+                // ફાયરબેઝમાં ડેટા જતા પહેલા પ્રોડક્ટના મેઈન ફોટાઓ (item.images) હટાવી દેવામાં આવે છે
+                const cleanItems = cart.map(item => ({
+                    id: item.id,
+                    name: item.name,
+                    price: item.price,
+                    selectedSize: item.selectedSize || null,
+                    quantity: item.quantity,
+                    referenceFile: item.referenceFile || ''
+                }));
+
                 const newOrder = { 
                     id: 'ORD-' + Date.now(), userId: user.email, 
                     address: { name: user.name || 'N/A', mobile: user.mobile || 'N/A', village: user.village || 'N/A', locality: user.locality || 'N/A', pincode: user.pincode || 'N/A', country: 'India' }, 
-                    items: [...cart], total, date: new Date().toLocaleDateString(), status: 'Pending'
+                    items: cleanItems, total, date: new Date().toLocaleDateString(), status: 'Pending'
                 };
+                
                 addOrder(newOrder).then(() => {
                     clearCart(); setSuccess(true);
-                    setTimeout(() => { setIsCheckingOut(false); setCurrentTab('profile'); }, 2000);
+                    setTimeout(() => { setIsCheckingOut(false); setSuccess(false); setCurrentTab('profile'); }, 2000);
+                }).catch(err => {
+                    alert("ઓર્ડર સેવ કરવામાં ભૂલ: " + err.message);
+                    setIsCheckingOut(false);
                 });
             };
 
@@ -446,7 +481,9 @@
                             <div className="lg:col-span-1">
                                 <div className="bg-white p-5 rounded-xl border shadow-sm">
                                     <div className="flex justify-between font-bold text-base mb-4 pt-1"><span>Total Amount</span><span>₹{total.toFixed(2)}</span></div>
-                                    <button onClick={handleCheckout} disabled={isCheckingOut} className="w-full py-2.5 bg-blue-600 text-white font-bold text-sm rounded-lg shadow">Checkout Order</button>
+                                    <button onClick={handleCheckout} disabled={isCheckingOut} className="w-full py-2.5 bg-blue-600 text-white font-bold text-sm rounded-lg shadow">
+                                        {isCheckingOut ? 'Processing...' : 'Checkout Order'}
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -547,7 +584,6 @@
                 });
             };
 
-            // ✅ એડમિન માટે એકસાથે ઘણા ફોટા અપલોડ અને સાઇઝ નાની (Compress) કરવાનું પાવરફુલ ફંક્શન
             const handleImageUpload = async (e) => {
                 const files = Array.from(e.target.files);
                 if (files.length === 0) return;
@@ -559,7 +595,7 @@
                             const img = new Image();
                             img.onload = () => {
                                 const canvas = document.createElement('canvas');
-                                const MAX_WIDTH = 400; // ફોટો બહુ મોટો ન બને તે માટે સાઈઝ ઘટાડી છે
+                                const MAX_WIDTH = 400; 
                                 const MAX_HEIGHT = 400;
                                 let width = img.width;
                                 let height = img.height;
@@ -575,7 +611,6 @@
                                 const ctx = canvas.getContext('2d');
                                 ctx.drawImage(img, 0, 0, width, height);
                                 
-                                // ✅ અહીં ફોટાની સાઈઝ માત્ર 50% કરી છે, જેથી બિલકુલ જગ્યા ન રોકે
                                 const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.5); 
                                 resolve(compressedDataUrl);
                             };
@@ -595,7 +630,6 @@
                 }
             };
 
-            // ખોટો ફોટો ડીલીટ કરવા માટે
             const removeImage = (indexToRemove) => {
                 setFormData(prev => ({
                     ...prev,
@@ -603,7 +637,6 @@
                 }));
             };
 
-            // HIGH SPEED DYNAMIC FULL-CARD SNAPSHOT DOWNLOAD SYSTEM
             const captureAndDownloadCardBox = () => {
                 if (!cardPrintRef.current) return;
                 alert("મોબાઈલ ગેલેરીમાં વિગતો સાથે ફોટો સેવ થઈ રહ્યો છે, કૃપા કરીને થોડી સેકન્ડ રાહ જુઓ...");
@@ -626,13 +659,11 @@
                 });
             };
 
-            // ✅ શુદ્ધ પેલોડ સેવ કરવા માટેની સિસ્ટમ 
             const handleSave = (e) => {
                 e.preventDefault();
                 const formattedSizes = sizes.map(s => ({ name: s.name, price: parseFloat(s.price) || 0 }));
                 const productId = formData.id || 'p' + Date.now();
                 
-                // નકામો ડેટા ફાયરબેઝમાં જતા અટકાવવા માટે પેલોડ સાફ કર્યો
                 const payload = {
                     id: productId,
                     name: formData.name || '',
@@ -651,7 +682,6 @@
                     setView('list');
                 })
                 .catch(err => {
-                    // જો ફાયરબેઝ રિજેક્ટ કરશે તો અહીં એરર દેખાશે
                     console.error("Save error:", err);
                 });
             };
@@ -685,12 +715,10 @@
                             )}
                             {view === 'add' && (
                                 <form onSubmit={handleSave} className="bg-white p-5 border rounded-xl space-y-4">
-                                    {/* ✅ મલ્ટીપલ પ્રોડક્ટ ફોટો અપલોડ બોક્સ */}
                                     <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-2">
                                         <label className="text-xs font-bold text-slate-700 block">પ્રોડક્ટના ફોટા અપલોડ કરો (એકથી વધુ સિલેક્ટ કરી શકો છો):</label>
                                         <input type="file" accept="image/*" multiple onChange={handleImageUpload} className="w-full p-2 border bg-white rounded text-xs" />
                                         
-                                        {/* પસંદ કરેલા ફોટાઓનું લિસ્ટ દેખાશે */}
                                         {formData.images && formData.images.length > 0 && (
                                             <div className="flex gap-3 overflow-x-auto mt-3 pb-2">
                                                 {formData.images.map((img, idx) => (
